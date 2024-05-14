@@ -1,6 +1,6 @@
 import argparse
 from models.model_builder import MODEL_TABLE
-from utils.dataset_config import DATASET_CONFIG
+from video_dataset.dataset_config import DATASET_CONFIG
 
 def arg_parser():
     parser = argparse.ArgumentParser(description='PyTorch Action recognition Training')

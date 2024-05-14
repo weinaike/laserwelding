@@ -198,10 +198,11 @@ class I3D_ResNet(nn.Module):
         x = x.squeeze(-1)
         x = x.transpose(1, 2)
         n, c, nf = x.size()
-        x = x.contiguous().view(n * c, -1)
+        x = x.contiguous().view(-1, nf)
         x = self.dropout(x)
         x = self.fc(x)
-        x = x.view(n, c, -1)
+        nc, nf = x.size()
+        x = x.view(-1, c, nf)
         # N x num_classes x ((F/8)-1)
         logits = torch.mean(x, 1)
 
