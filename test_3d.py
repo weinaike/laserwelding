@@ -13,8 +13,7 @@ from tqdm import tqdm
 from models import build_model
 from utils.utils import build_dataflow, AverageMeter, accuracy
 from utils.video_transforms import *
-from utils.video_dataset import VideoDataSet
-from utils.dataset_config import get_dataset_config
+from video_dataset.dataset_config import get_dataset_config
 from opts import arg_parser
 
 
