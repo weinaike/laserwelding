@@ -60,6 +60,8 @@ def main():
         args.input_channels = 3
     elif args.modality == 'flow':
         args.input_channels = 2 * 5
+    elif args.modality == 'gray':
+        args.input_channels = 1
 
     model, arch_name = build_model(args, test_mode=True)
     mean = model.mean(args.modality)
@@ -72,7 +74,10 @@ def main():
                 raise ValueError("When training with rgb, dim of mean must be three.")
         elif args.modality == 'flow':
             if len(args.mean) != 1:
-                raise ValueError("When training with flow, dim of mean must be three.")
+                raise ValueError("When training with flow, dim of mean must be one.")
+        elif args.modality == 'gray':
+            if len(args.mean) != 1:
+                raise ValueError("When training with gray, dim of mean must be one.")
         mean = args.mean
 
     if args.std is not None:
@@ -81,7 +86,10 @@ def main():
                 raise ValueError("When training with rgb, dim of std must be three.")
         elif args.modality == 'flow':
             if len(args.std) != 1:
-                raise ValueError("When training with flow, dim of std must be three.")
+                raise ValueError("When training with flow, dim of std must be one.")
+        elif args.modality == 'gray':
+            if len(args.std) != 1:
+                raise ValueError("When training with gray, dim of std must be one.")
         std = args.std
 
     model = model.cuda()
@@ -205,9 +213,9 @@ def main():
                 predictions = np.argsort(output, axis=1)
                 for ii in range(len(predictions)):
                     # preds = [id_to_label[str(pred)] for pred in predictions[ii][::-1][:5]]
-                    temp = predictions[ii][::-1][:5]
+                    temp = predictions[ii][::-1][:2]
                     preds = [str(pred) for pred in temp]
-                    print("{};{}".format(label[ii], ";".join(preds)), file=logfile)
+                    print("{},{}".format(str(label[ii].numpy()), ",".join(preds)), file=logfile)
             total_outputs += video.shape[0]
             batch_time.update(time.time() - end)
             end = time.time()

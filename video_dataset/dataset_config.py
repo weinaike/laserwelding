@@ -57,6 +57,7 @@ DATASET_CONFIG = {
         'num_classes': 4,
         'train_list_name': 'train_penetration.txt',
         'val_list_name': 'val_penetration.txt',
+        'test_list_name': 'unknown.txt',
         'filename_seperator': " ",
         'image_tmpl': '{:05d}.png',
         'filter_video': 0

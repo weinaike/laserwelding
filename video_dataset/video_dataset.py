@@ -6,6 +6,7 @@ from PIL import Image
 import torch.utils.data as data
 import matplotlib.pyplot as plt
 import torchvision
+import random
 
 def random_clip(video_frames, sampling_rate, frames_per_clip, fixed_offset=False):
     """
@@ -163,7 +164,7 @@ class VideoDataSet(data.Dataset):
         assert (num > 0)
         file_list = []
         for item in tmp:
-            if self.test_mode:
+            if len(item) == 3:
                 file_list.append([item[0], int(item[1]), int(item[2]), -1])
             else:
                 labels = []
@@ -192,7 +193,11 @@ class VideoDataSet(data.Dataset):
         """
         max_frame_idx = max(1, record.num_frames - self.num_consecutive_frames + 1)
         if self.dense_sampling:
-            frame_idx = np.asarray(random_clip(max_frame_idx, self.sample_freq, self.num_frames))
+            if self.sample_freq > 1:
+                freq = random.randint(1, self.sample_freq)
+            else:
+                freq = self.sample_freq
+            frame_idx = np.asarray(random_clip(max_frame_idx, freq, self.num_frames))
         else:
             total_frames = self.num_groups * self.frames_per_group
             ave_frames_per_group = max_frame_idx // self.num_groups

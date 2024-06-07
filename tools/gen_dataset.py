@@ -13,18 +13,20 @@ def split_trainval(f_pene, ext):
         lines = f_pene
 
     samples = dict()
-    Small_Penetration = list()
+    unknown = list()
     for line in lines:
-        line = line.strip()
-        if "Small_Penetration" in line:
-            Small_Penetration.append(line)
-            continue
-        
+        line = line.strip()       
         items = line.split(' ')
-        if items[-1] in samples.keys():
-            samples[items[-1]].append(line)
+
+        key = int(items[-1])
+        if key < 0:
+            unknown.append(line)
+            continue
+
+        if key in samples.keys():
+            samples[key].append(line)
         else:
-            samples[items[-1]] = [line]
+            samples[key] = [line]
     
     for key in samples.keys():
         print(key, len(samples[key]))
@@ -51,8 +53,8 @@ def split_trainval(f_pene, ext):
             item = item[7:]
             f.write("%s\n" % item)
 
-    with open(f"images/val_Small_Penetration.txt", 'w') as f:
-        for item in Small_Penetration:
+    with open(f"images/unknown.txt", 'w') as f:
+        for item in unknown:
             # 字符串中去掉开头的 'images/'
             item = item[7:]
             f.write("%s\n" % item)
@@ -136,13 +138,35 @@ def split_trainval_random(lines, ext):
             f.write("%s\n" % item)
 
 
+def get_black_lines(root, dir):
+    path = os.path.join(root, dir)
+    samples = os.listdir(path)
+
+    black_list = []
+
+    for sample in samples:
+        img_dir = os.path.join(path, sample)
+        images = os.listdir(img_dir)
+        images.sort()
+        start = int(images[0].split('.')[0])
+        end = int(images[-1].split('.')[0])
+
+        step = 32
+        if(end - start < step):
+            continue
+
+        for i in range(start, end - step, step//4):
+            black_list.append(f"{img_dir} {i} {i + step} {3}")
+    return black_list
+        
 if __name__ == "__main__":
     # 遍历images中所有文件，找到所有KHD.txt 文件
     # 将所有KHD.txt文件行合并
-
+    black_list = get_black_lines('images', 'black_sample')
     all_khd = get_all_lines('images', 'KHD.txt')
     all_pene = get_all_lines('images', 'penetration.txt')
-    split_trainval(all_pene, 'penetration')
+    black_list = get_black_lines('images', 'black_sample')
+    split_trainval(all_pene + black_list, 'penetration')
 
     all_khd_filter = filter_khd_info(all_khd)
 

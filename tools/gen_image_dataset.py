@@ -58,19 +58,36 @@ def gen_depth_labels(v_lists, image_paths, output, param:dict):
                 print(path, s, e, "empty")
                 continue                
             else:                
-                # 提取 val 第二列的最小值
-                # print(vals)
+
                 value = int(vals.iloc[:,1].min())
                 line = f'{image_paths[i]} {j} {j + step} {value}\n'
                 f_khd.write(line)
-                if value < depth - 250:     # 熔透状态
-                    pene_label = 1
-                    if "Over_Penetration" in v_lists[i]:
-                        pene_label = 2      # 过熔透状态
-                elif value > depth + 250:
-                    pene_label = 0          # 未熔透状态
-                else:
-                    pene_label = 3          # 临界状态， 待定
+
+
+                ## 标签判断
+                if 'Incomplete_Penetration' in v_lists[i]:
+                    if(value > depth): #未熔透
+                        pene_label = 0
+                    else:
+                        pene_label = value                        
+                elif 'Small_Penetration' in v_lists[i]:
+                    if value > depth + 250:
+                        pene_label = 0
+                    elif value < depth - 256:
+                        pene_label = 1
+                    else:
+                        pene_label = value # 保留原值
+                elif 'Normal_Penetration' in v_lists[i]: # 熔透与过熔透
+                    if value < depth:     # 熔透状态
+                        pene_label = 1
+                    else:
+                        pene_label = value
+                elif "Over_Penetration" in v_lists[i]:
+                    if value < depth:     # 熔透状态
+                        pene_label = 2    # 过熔透状态
+                    else:
+                        pene_label = value
+                    
                 line = f'{image_paths[i]} {j} {j + step} {pene_label}\n'
                 f_pene.write(line)
 

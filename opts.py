@@ -14,8 +14,8 @@ def arg_parser():
                         help='dropout ratio before the final layer')
     parser.add_argument('--groups', default=16, type=int, help='number of frames')
     parser.add_argument('--frames_per_group', default=1, type=int,
-                        help='[uniform sampling] number of frames per group; '
-                             '[dense sampling]: sampling frequency')
+                        help='[uniform sampling] number of frames per group; 均匀采样， 每组采样数量' 
+                             '[dense sampling]: sampling frequency, 密集采样，对应采样间隔')
     parser.add_argument('--without_t_stride', dest='without_t_stride', action='store_true',
                         help='skip the temporal pooling in the model')
     parser.add_argument('--pooling_method', default='max',
