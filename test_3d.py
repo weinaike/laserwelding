@@ -9,13 +9,16 @@ import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.transforms as transforms
 from tqdm import tqdm
-
+from sklearn.metrics import confusion_matrix
 from models import build_model
 from utils.utils import build_dataflow, AverageMeter, accuracy
 from utils.video_transforms import *
+from video_dataset.video_dataset import VideoDataSet
 from video_dataset.dataset_config import get_dataset_config
 from opts import arg_parser
 
+import matplotlib.pyplot as plt
+import torchvision
 
 def eval_a_batch(data, model, num_clips=1, num_crops=1, threed_data=False):
     with torch.no_grad():
@@ -87,7 +90,8 @@ def main():
     if args.pretrained is not None:
         print("=> using pre-trained model '{}'".format(arch_name))
         checkpoint = torch.load(args.pretrained, map_location='cpu')
-        model.load_state_dict(checkpoint['state_dict'])
+        checkpoint = {k.replace('module.', ''): v for k, v in checkpoint['state_dict'].items()}
+        model.load_state_dict(checkpoint)
     else:
         print("=> creating model '{}'".format(arch_name))
 
@@ -102,8 +106,9 @@ def main():
     augments = []
     if args.num_crops == 1:
         augments += [
+            GroupCenterCrop(512),
             GroupScale(scale_size),
-            GroupCenterCrop(args.input_size)
+            GroupCenterCrop(scale_size),
         ]
     else:
         flip = True if args.num_crops == 10 else False
@@ -153,6 +158,10 @@ def main():
     # switch to evaluate mode
     model.eval()
     total_batches = len(data_loader)
+
+    all_preds = []
+    all_labels = []          
+
     with torch.no_grad(), tqdm(total=total_batches) as t_bar:
         end = time.time()
         for i, (video, label) in enumerate(data_loader):
@@ -160,13 +169,34 @@ def main():
                                   threed_data=args.threed_data)
             if args.evaluate:
                 label = label.cuda(non_blocking=True)
+                _, predicted = torch.max(output.data, 1)
                 # measure accuracy
-                prec1, prec5 = accuracy(output, label, topk=(1, 5))
+                prec1, prec5 = accuracy(output, label, topk=(1, 2))
                 top1.update(prec1[0], video.size(0))
                 top5.update(prec5[0], video.size(0))
                 output = output.data.cpu().numpy().copy()
                 batch_size = output.shape[0]
                 outputs[total_outputs:total_outputs + batch_size, :] = output
+
+                all_preds.extend(predicted.cpu().numpy())
+                all_labels.extend(label.cpu().numpy())
+
+                if args.debug:
+                    # 显示 video 中的所有图片，绘制到一张图上， video.Size([1, 12, 224, 224]) 
+                    show = video.view(3, -1, 224, 224)
+                    # show = video.view(-1, 1, 224, 224)
+                    # for i in range(show.size(0)):
+                    #     # 保存（1，224，224）致文件
+                    #     torch.save(show[i], f'snapshots/test{i}.pth')
+                        
+                    show = show.transpose(0, 1)
+                    grid =  torchvision.utils.make_grid(show, nrow=4)
+                    grid = grid.numpy().transpose((1, 2, 0))
+                    plt.figure()
+                    plt.imshow(grid)
+                    plt.title(f"Label: {label[0]}, predicted: {predicted[0]}")
+                    plt.show()
+
             else:
                 # testing, store output to prepare csv file
                 output = output.data.cpu().numpy().copy()
@@ -190,15 +220,20 @@ def main():
             args.num_clips, args.input_size)), outputs)
 
     if args.evaluate:
-        print('Val@{}({}) (# crops = {}, # clips = {}): \tTop@1: {:.4f}\tTop@5: {:.4f}'.format(
+        print('Val@{}({}) (# crops = {}, # clips = {}): \tTop@1: {:.4f}\tTop@2: {:.4f}'.format(
             args.input_size, scale_size, args.num_crops, args.num_clips, top1.avg, top5.avg),
             flush=True)
-        print('Val@{}({}) (# crops = {}, # clips = {}): \tTop@1: {:.4f}\tTop@5: {:.4f}'.format(
+        print('Val@{}({}) (# crops = {}, # clips = {}): \tTop@1: {:.4f}\tTop@2: {:.4f}'.format(
             args.input_size, scale_size, args.num_crops, args.num_clips, top1.avg, top5.avg),
             flush=True, file=logfile)
+        
+        cm = confusion_matrix(all_labels, all_preds)
+        # 输出三分类测试混淆矩阵
+        print('Confusion Matrix:')
+        print(cm)
+        print(cm, file=logfile)
 
     logfile.close()
-
 
 if __name__ == '__main__':
     main()

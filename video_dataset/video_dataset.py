@@ -4,7 +4,8 @@ import numpy as np
 import torch
 from PIL import Image
 import torch.utils.data as data
-
+import matplotlib.pyplot as plt
+import torchvision
 
 def random_clip(video_frames, sampling_rate, frames_per_clip, fixed_offset=False):
     """
@@ -72,7 +73,7 @@ class VideoDataSet(data.Dataset):
             is_train (bool): shuffle the video but keep the causality
             test_mode (bool): testing mode, no label
         """
-        if modality not in ['flow', 'rgb']:
+        if modality not in ['flow', 'rgb', 'gray']:
             raise ValueError("modality should be 'flow' or 'rgb'.")
 
         self.root_path = root_path
@@ -107,8 +108,10 @@ class VideoDataSet(data.Dataset):
     def _load_image(self, directory, idx):
 
         def _safe_load_image(img_path):
-            img_tmp = Image.open(img_path)
+            img_tmp = Image.open(img_path)           
             img = img_tmp.copy()
+            if self.modality == 'rgb':
+                img = img.convert('RGB')
             img_tmp.close()
             return img
 
@@ -118,7 +121,10 @@ class VideoDataSet(data.Dataset):
         while num_try < 10:
             try:
                 if self.modality == 'rgb':
-                    img = [_safe_load_image(image_path_file)]
+                    img = [_safe_load_image(image_path_file)]                    
+                elif self.modality == 'gray':
+                    img = [_safe_load_image(image_path_file).convert('L')]
+                    # 扩展为三维
                 else:
                     ext = image_path_file.split(".")[-1]
                     flow_x_name = image_path_file.replace(".{}".format(ext), "_x.{}".format(ext))
@@ -279,20 +285,45 @@ class VideoDataSet(data.Dataset):
             indices = self._get_val_indices(record)
 
         images = []
+
+        
+        # print(record.path,  record.video_id, record.start_frame, record.end_frame, record.label)
+        # print(indices)
         for seg_ind in indices:
             for i in range(self.num_consecutive_frames):
-                new_seg_ind = min(seg_ind + record.start_frame - 1 + i, record.num_frames)
+                new_seg_ind = min(seg_ind + record.start_frame - 1 + i, record.end_frame)
+                # print(new_seg_ind)
                 seg_imgs = self._load_image(record.path, new_seg_ind)
                 images.extend(seg_imgs)
 
-        images = self.transform(images)
-        if self.test_mode:
-            # in test mode, return the video id as label
-            label = int(record.video_id)
-        else:
-            label = int(record.label)
 
+        # for image in images:
+        #     plt.figure("original image")
+        #     plt.imshow(image)
+        #     plt.show()
+
+        images = self.transform(images)
+
+        
+        # 显示 images
+        # grid = torchvision.utils.make_grid(images.transpose(0,1), nrow=2)
+        # grid = grid.numpy().transpose((1, 2, 0))
+        # plt.figure("transform image")
+        # plt.imshow(grid)
+        # plt.show()
+
+
+        # if self.test_mode:
+        #     # in test mode, return the video id as label
+        #     label = int(record.video_id)
+        # else:
+        #     label = int(record.label)
+
+        label = int(record.label)
         # re-order data to targeted format.
+        h, w = images.size()[-2:]
+        images = images.view(-1,h,w )
+
         return images, label
 
     def __len__(self):

@@ -72,8 +72,7 @@ def arg_parser():
     parser.add_argument('--datadir', metavar='DIR', help='path to dataset file list')
     parser.add_argument('--dataset', default='st2stv2',
                         choices=list(DATASET_CONFIG.keys()), help='which dataset.')
-    parser.add_argument('--threed_data', action='store_true',
-                        help='format data to 5D for 3D onv.')
+    parser.add_argument('--threed_data', action='store_true',  help='format data to 5D for 3D onv.')
     parser.add_argument('--input_size', default=224, type=int, metavar='N', help='spatial size')
     parser.add_argument('--disable_scaleup', action='store_true',
                         help='do not scale up and then crop a small region, '
@@ -83,12 +82,12 @@ def arg_parser():
                              'for data loader during the evaluation.')
     parser.add_argument('--dense_sampling', action='store_true',
                         help='perform dense sampling for data loader')
-    parser.add_argument('--augmentor_ver', default='v1', type=str, choices=['v1', 'v2'],
+    parser.add_argument('--augmentor_ver', default='v1', type=str, choices=['v1', 'v2', 'v3', 'v4'],
                         help='[v1] TSN data argmentation, [v2] resize the shorter side to `scale_range`')
-    parser.add_argument('--scale_range', default=[256, 320], type=int, nargs="+",
+    parser.add_argument('--scale_range', default=[224, 256], type=int, nargs="+",
                         metavar='scale_range', help='scale range for augmentor v2')
     parser.add_argument('--modality', default='rgb', type=str, help='rgb or flow',
-                        choices=['rgb', 'flow'])
+                        choices=['rgb', 'flow', 'gray'])
     parser.add_argument('--mean', type=float, nargs="+", metavar='MEAN',
                         help='[Data normalization] mean, dimension should be 3 for RGB, 1 for flow')
     parser.add_argument('--std', type=float, nargs="+", metavar='STD',
@@ -124,5 +123,8 @@ def arg_parser():
                              'N processes per node, which has N GPUs. This is the '
                              'fastest way to use PyTorch for either single node or '
                              'multi node data parallel training')
-
+    parser.add_argument('--debug', action='store_true', help='debug info')
+    parser.add_argument('--criterion', default='softmax', type=str, choices=['softmax', 'L1', 'MSE'],
+                        help='[v1] TSN data argmentation, [v2] resize the shorter side to `scale_range`')
+    
     return parser

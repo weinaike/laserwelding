@@ -17,8 +17,7 @@ from torch.optim import lr_scheduler
 # import tensorboard_logger
 
 from models import build_model
-from utils.utils import (train, validate, build_dataflow, get_augmentor,
-                         save_checkpoint)
+from utils.utils import (build_dataflow, get_augmentor,save_checkpoint)
 from video_dataset.video_dataset import VideoDataSet
 from video_dataset.dataset_config import get_dataset_config
 from opts import arg_parser
@@ -68,6 +67,8 @@ def main_worker(gpu, ngpus_per_node, args):
         args.input_channels = 3
     elif args.modality == 'flow':
         args.input_channels = 2 * 5
+    elif args.modality == 'gray':
+        args.input_channels = 1
 
     model, arch_name = build_model(args)
     mean = model.mean(args.modality)
@@ -81,6 +82,9 @@ def main_worker(gpu, ngpus_per_node, args):
         elif args.modality == 'flow':
             if len(args.mean) != 1:
                 raise ValueError("When training with flow, dim of mean must be three.")
+        elif args.modality == 'gray':
+            if len(args.mean) != 1:
+                raise ValueError("When training with gray, dim of mean must be one.")
         mean = args.mean
 
     if args.std is not None:
@@ -90,6 +94,9 @@ def main_worker(gpu, ngpus_per_node, args):
         elif args.modality == 'flow':
             if len(args.std) != 1:
                 raise ValueError("When training with flow, dim of std must be three.")
+        elif args.modality == 'gray':
+            if len(args.std) != 1:
+                raise ValueError("When training with gray, dim of std must be one.")
         std = args.std
 
     model = model.cuda(args.gpu)
@@ -145,8 +152,24 @@ def main_worker(gpu, ngpus_per_node, args):
         args.rank = 0
 
     # define loss function (criterion) and optimizer
-    train_criterion = nn.CrossEntropyLoss().cuda(args.gpu)
-    val_criterion = nn.CrossEntropyLoss().cuda(args.gpu)
+    if args.criterion == 'softmax':
+        train_criterion = nn.CrossEntropyLoss().cuda(args.gpu)
+        val_criterion = nn.CrossEntropyLoss().cuda(args.gpu)
+    elif args.criterion == 'L1':
+        train_criterion = nn.L1Loss().cuda(args.gpu)
+        val_criterion = nn.L1Loss().cuda(args.gpu)
+    elif args.criterion == 'MSE':
+        train_criterion = nn.MSELoss().cuda(args.gpu)
+        val_criterion = nn.MSELoss().cuda(args.gpu)
+    else:
+        raise ValueError("Criterion not supported: {}".format(args.criterion))
+
+    if args.criterion == 'softmax':
+        from utils.utils import train as train
+        from utils.utils import validate as validate
+    else:
+        from utils.utils import train_regression as train
+        from utils.utils import validate_regression as validate
 
     # Data loading code
     val_list = os.path.join(args.datadir, val_list_name)
@@ -167,14 +190,15 @@ def main_worker(gpu, ngpus_per_node, args):
     val_loader = build_dataflow(val_dataset, is_train=False, batch_size=args.batch_size,
                                 workers=args.workers,
                                 is_distributed=args.distributed)
-
+    # 加上时间戳
+    arch_name += time.strftime('_%Y%m%d_%H%M%S')
     log_folder = os.path.join(args.logdir, arch_name)
     if args.rank == 0:
         if not os.path.exists(log_folder):
             os.makedirs(log_folder)
 
     if args.evaluate:
-        val_top1, val_top5, val_losses, val_speed = validate(val_loader, model, val_criterion,
+        val_top1, val_top5, val_losses, val_speed, cm = validate(val_loader, model, val_criterion,
                                                              gpu_id=args.gpu)
         if args.rank == 0:
             logfile = open(os.path.join(log_folder, 'evaluate_log.log'), 'a')
@@ -187,6 +211,7 @@ def main_worker(gpu, ngpus_per_node, args):
                     args.input_size, val_losses, val_top1, val_top5, val_speed * 1000.0),
                 flush=True,
                 file=logfile)
+            print(cm, flush=True,file=logfile)
         return
 
     train_list = os.path.join(args.datadir, train_list_name)
@@ -282,9 +307,10 @@ def main_worker(gpu, ngpus_per_node, args):
             dist.barrier()
 
         # evaluate on validation set
-        val_top1, val_top5, val_losses, val_speed = validate(val_loader, model, val_criterion,
+        val_top1, val_top5, val_losses, val_speed, cm = validate(val_loader, model, val_criterion,
                                                              gpu_id=args.gpu)
 
+        print(cm, flush=True,file=logfile)
         # update current learning rate
         if args.lr_scheduler == 'plateau':
             scheduler.step(val_losses)
@@ -296,19 +322,19 @@ def main_worker(gpu, ngpus_per_node, args):
 
         # only logging at rank 0
         if args.rank == 0:
-            print('Train: [{:03d}/{:03d}]\tLoss: {:4.4f}\tTop@1: {:.4f}\tTop@5: {:.4f}\t'
+            print('Train: [{:03d}/{:03d}]\tLoss: {:4.4f}\tTop@1: {:.4f}\tTop@2: {:.4f}\t'
                   'Speed: {:.2f} ms/batch\tData loading: {:.2f} ms/batch'.format(
                 epoch + 1, args.epochs, train_losses, train_top1, train_top5, train_speed * 1000.0,
                 speed_data_loader * 1000.0), file=logfile, flush=True)
-            print('Train: [{:03d}/{:03d}]\tLoss: {:4.4f}\tTop@1: {:.4f}\tTop@5: {:.4f}\t'
+            print('Train: [{:03d}/{:03d}]\tLoss: {:4.4f}\tTop@1: {:.4f}\tTop@2: {:.4f}\t'
                   'Speed: {:.2f} ms/batch\tData loading: {:.2f} ms/batch'.format(
                 epoch + 1, args.epochs, train_losses, train_top1, train_top5, train_speed * 1000.0,
                 speed_data_loader * 1000.0), flush=True)
-            print('Val  : [{:03d}/{:03d}]\tLoss: {:4.4f}\tTop@1: {:.4f}\tTop@5: {:.4f}\t'
+            print('Val  : [{:03d}/{:03d}]\tLoss: {:4.4f}\tTop@1: {:.4f}\tTop@2: {:.4f}\t'
                   'Speed: {:.2f} ms/batch'.format(epoch + 1, args.epochs, val_losses, val_top1,
                                                   val_top5, val_speed * 1000.0), file=logfile,
                   flush=True)
-            print('Val  : [{:03d}/{:03d}]\tLoss: {:4.4f}\tTop@1: {:.4f}\tTop@5: {:.4f}\t'
+            print('Val  : [{:03d}/{:03d}]\tLoss: {:4.4f}\tTop@1: {:.4f}\tTop@2: {:.4f}\t'
                   'Speed: {:.2f} ms/batch'.format(epoch + 1, args.epochs, val_losses, val_top1,
                                                   val_top5, val_speed * 1000.0), flush=True)
 
@@ -332,11 +358,11 @@ def main_worker(gpu, ngpus_per_node, args):
                 lr = None
             # if lr is not None:
             #     tensorboard_logger.log_value('learning-rate', lr, epoch + 1)
-            # tensorboard_logger.log_value('val-top1', val_top1, epoch + 1)
-            # tensorboard_logger.log_value('val-loss', val_losses, epoch + 1)
-            # tensorboard_logger.log_value('train-top1', train_top1, epoch + 1)
-            # tensorboard_logger.log_value('train-loss', train_losses, epoch + 1)
-            # tensorboard_logger.log_value('best-val-top1', best_top1, epoch + 1)
+            #     tensorboard_logger.log_value('val-top1', val_top1, epoch + 1)
+            #     tensorboard_logger.log_value('val-loss', val_losses, epoch + 1)
+            #     tensorboard_logger.log_value('train-top1', train_top1, epoch + 1)
+            #     tensorboard_logger.log_value('train-loss', train_losses, epoch + 1)
+            #     tensorboard_logger.log_value('best-val-top1', best_top1, epoch + 1)
 
         if args.distributed:
             dist.barrier()

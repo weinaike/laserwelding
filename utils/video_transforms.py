@@ -76,6 +76,7 @@ class GroupNormalize(object):
     def __call__(self, tensor):
 
         if self.threed_data:
+            #扩展tensor维度 [8, 224, 224] --> [1, 8, 224, 224]         
             tensor.sub_(self.mean).div_(self.std)
         else:
             rep_mean = self.mean * (tensor.size()[0] // len(self.mean))
@@ -312,7 +313,10 @@ class Stack(object):
 
     def __call__(self, img_group):
         if img_group[0].mode == 'L':
-            return np.concatenate([np.expand_dims(x, 2) for x in img_group], axis=2)
+            if self.threed_data:
+                return np.stack([np.expand_dims(x, 2) for x in img_group], axis=0)
+            else:
+                return np.concatenate([np.expand_dims(x, 2) for x in img_group], axis=2)
         elif img_group[0].mode == 'RGB':
             if self.threed_data:
                 return np.stack(img_group, axis=0)

@@ -54,11 +54,19 @@ DATASET_CONFIG = {
         'filter_video': 0
     },
     'laser_welding': {
-        'num_classes': 2,
-        'train_list_name': 'train.txt',
-        'val_list_name': 'val.txt',
+        'num_classes': 4,
+        'train_list_name': 'train_penetration.txt',
+        'val_list_name': 'val_penetration.txt',
         'filename_seperator': " ",
-        'image_tmpl': '{:05d}.jpg',
+        'image_tmpl': '{:05d}.png',
+        'filter_video': 0
+    },
+    'laser_welding_depth': {
+        'num_classes': 1,
+        'train_list_name': 'train_depth.txt',
+        'val_list_name': 'val_depth.txt',
+        'filename_seperator': " ",
+        'image_tmpl': '{:05d}.png',
         'filter_video': 0
     },
 }

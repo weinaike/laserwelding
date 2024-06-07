@@ -113,7 +113,7 @@ class Bottleneck(nn.Module):
 class ResNet(nn.Module):
 
     def __init__(self, depth, num_frames, num_classes=1000, dropout=0.5, zero_init_residual=False,
-                 without_t_stride=False, temporal_module=None, pooling_method='max'):
+                 without_t_stride=False, temporal_module=None, pooling_method='max', modality='rgb'):
         super(ResNet, self).__init__()
 
         self.pooling_method = pooling_method.lower()
@@ -131,9 +131,16 @@ class ResNet(nn.Module):
         self.orig_num_frames = num_frames
         self.num_classes = num_classes
         self.without_t_stride = without_t_stride
-
+        self.modality = modality
         self.inplanes = 64
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        if self.modality == 'rgb':
+            self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        elif self.modality == 'gray':
+            self.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        elif self.modality == 'flow':
+            self.conv1 = nn.Conv2d(2, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        else:
+            raise ValueError("Unknown modality {}".format(self.modality))            
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -222,10 +229,10 @@ class ResNet(nn.Module):
         return out
 
     def mean(self, modality='rgb'):
-        return [0.485, 0.456, 0.406] if modality == 'rgb' else [0.5]
+        return [0.0, 0.0, 0.0] if modality == 'rgb' else [0.0]
 
     def std(self, modality='rgb'):
-        return [0.229, 0.224, 0.225] if modality == 'rgb' else [np.mean([0.229, 0.224, 0.225])]
+        return [1.0, 1.0, 1.0] if modality == 'rgb' else [1.0]
 
     @property
     def network_name(self):
@@ -248,7 +255,7 @@ class ResNet(nn.Module):
 
 def resnet(depth, num_classes, without_t_stride, groups, temporal_module_name,
            dw_conv, blending_frames, blending_method, dropout, pooling_method,
-           imagenet_pretrained=True, **kwargs):
+           imagenet_pretrained=True, modality='rgb',**kwargs):
 
     temporal_module = partial(temporal_modeling_module, name=temporal_module_name,
                               dw_conv=dw_conv,
@@ -259,12 +266,15 @@ def resnet(depth, num_classes, without_t_stride, groups, temporal_module_name,
     model = ResNet(depth, num_frames=groups, num_classes=num_classes,
                    without_t_stride=without_t_stride,
                    temporal_module=temporal_module, dropout=dropout,
-                   pooling_method=pooling_method)
+                   pooling_method=pooling_method, modality=modality)
 
     if imagenet_pretrained:
         state_dict = model_zoo.load_url(model_urls['resnet{}'.format(depth)], map_location='cpu')
         state_dict.pop('fc.weight', None)
         state_dict.pop('fc.bias', None)
+        if modality == 'gray':
+            state_dict['conv1.weight'] = torch.mean(state_dict['conv1.weight'], dim=1, keepdim=True)
         model.load_state_dict(state_dict, strict=False)
+        print("============> loaded pre-trained model ")
 
     return model

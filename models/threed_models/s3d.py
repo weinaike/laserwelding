@@ -65,10 +65,10 @@ class S3D(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
     def mean(self, modality='rgb'):
-        return [0.5, 0.5, 0.5] if modality == 'rgb' else [0.5]
+        return [0.0, 0.0, 0.0] if modality == 'rgb' else [0.0]
 
     def std(self, modality='rgb'):
-        return [0.5, 0.5, 0.5] if modality == 'rgb' else [0.5]
+        return [1.0, 1.0, 1.0] if modality == 'rgb' else [1.0]
 
     @property
     def network_name(self):

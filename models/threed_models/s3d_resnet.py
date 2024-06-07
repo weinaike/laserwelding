@@ -182,10 +182,10 @@ class S3D_ResNet(nn.Module):
                     nn.init.constant_(m.bn2.weight, 0)
     
     def mean(self, modality='rgb'):
-        return [0.485, 0.456, 0.406] if modality == 'rgb' else [0.5]
+        return [0.0, 0.0, 0.0] if modality == 'rgb' else [0.0]
 
     def std(self, modality='rgb'):
-        return [0.229, 0.224, 0.225] if modality == 'rgb' else [np.mean([0.229, 0.224, 0.225])]
+        return [1.0, 1.0, 1.0] if modality == 'rgb' else [1.0]
     
     @property
     def network_name(self):
