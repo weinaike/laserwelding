@@ -11,7 +11,7 @@ import torchvision.transforms as transforms
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix
 from models import build_model
-from utils.utils import build_dataflow, AverageMeter, accuracy
+from utils.utils import build_dataflow, AverageMeter, accuracy, get_augmentor
 from utils.video_transforms import *
 from video_dataset.video_dataset import VideoDataSet
 from video_dataset.dataset_config import get_dataset_config
@@ -42,8 +42,8 @@ def eval_a_batch(data, model, num_clips=1, num_crops=1, threed_data=False):
 
     return result
 
-def create_model(args):
-
+def create_model(args, num_class):
+    args.num_classes = num_class
     cudnn.benchmark = False
     
     if args.gpu:
@@ -69,52 +69,27 @@ def create_model(args):
 
     return model
 
-    result = model(data) 
-def test_videos(videos, model, args):
+
+def test_cls(videos, model, args):
+    
+    model = model.cuda()
+    model.eval()
 
     mean = model.mean(args.modality)
     std = model.std(args.modality)
 
-    # overwrite mean and std if they are presented in command
-    if args.mean is not None:
-        if args.modality == 'rgb':
-            if len(args.mean) != 3:
-                raise ValueError("When training with rgb, dim of mean must be three.")
-        elif args.modality == 'flow':
-            if len(args.mean) != 1:
-                raise ValueError("When training with flow, dim of mean must be three.")
-        mean = args.mean
-
-    if args.std is not None:
-        if args.modality == 'rgb':
-            if len(args.std) != 3:
-                raise ValueError("When training with rgb, dim of std must be three.")
-        elif args.modality == 'flow':
-            if len(args.std) != 1:
-                raise ValueError("When training with flow, dim of std must be three.")
-        std = args.std
-
-    scale_size = args.input_size
-   
-    augmentor = transforms.Compose( [
-            GroupCenterCrop(512),
-            GroupScale(scale_size),
-            GroupCenterCrop(scale_size),
-            Stack(threed_data=args.threed_data),
-            ToTorchFormatTensor(num_clips_crops=args.num_clips * args.num_crops),
-            GroupNormalize(mean=mean, std=std, threed_data=args.threed_data)
-            ]
-        )
-
-    model = model.cuda()
-    model.eval()
+    augmentor = get_augmentor(False, args.input_size, scale_range=args.scale_range, mean=mean,
+                                  std=std, disable_scaleup=args.disable_scaleup,
+                                  threed_data=args.threed_data,
+                                  is_flow=True if args.modality == 'flow' else False,
+                                  version=args.augmentor_ver)
 
 
-    label ={ 0: 'Incompelement_Penetration', 1: 'Normal_Penetration', 2: 'Over_Penetration', 3: 'unkown', -1 : 'unkown'}
+    label ={ 0: 'Incompelement_Penetration', 1: 'Normal_Penetration', 2: 'Over_Penetration', 3: 'black', -1 : 'unkown'}
 
     for video in videos:
         f =  open(video, 'rb') 
-
+        f_res = open(os.path.join('images', os.path.basename(video.replace('.raw', '.txt'))), 'w')
         output_name = os.path.join('images', os.path.basename(video.replace('.raw', '.yuv')))
 
 
@@ -143,7 +118,8 @@ def test_videos(videos, model, args):
                 print(video, predicted)
                 
                 image_stack.clear()
-            
+
+            f_res.write("{} {}\n".format(i, predicted))
             # Convert PIL Image to OpenCV format
             img_cv = np.array(img)
 
@@ -159,15 +135,158 @@ def test_videos(videos, model, args):
                 -pix_fmt yuv420p {output_name.replace('yuv', 'mp4')}; rm {output_name}"
         os.system(cmd)
         f.close()
+        f_res.close()
+
+
+def test_depth(videos, model, args):
+
     
+    model = model.cuda()
+    model.eval()
+
+    mean = model.mean(args.modality)
+    std = model.std(args.modality)
+    augmentor = get_augmentor(False, args.input_size, scale_range=args.scale_range, mean=mean,
+                                std=std, disable_scaleup=args.disable_scaleup,
+                                threed_data=args.threed_data,
+                                is_flow=True if args.modality == 'flow' else False,
+                                version=args.augmentor_ver)
+
+
+    for video in videos:
+        f =  open(video, 'rb') 
+
+        f_res = open(os.path.join('images', os.path.basename(video.replace('.raw', '_depth.txt'))), 'w')
+        output_name = os.path.join('images', os.path.basename(video.replace('.raw', '_depth.yuv')))
+
+        image_stack = []
+        i = 0
+        predicted = 0
+        while True:
+            bytes = f.read(640*512)
+            if not bytes:
+                break
+            img = Image.frombytes('L', (640, 512), bytes)
+            i += 1
+            # if i % 4 == 0:
+            #     image_stack.append(img)
+            image_stack.append(img)
+            if len(image_stack) == 8:
+
+                imgs = augmentor(image_stack)
+                imgs.unsqueeze_(0)
+
+                imgs = imgs.cuda()
+                output = eval_a_batch(imgs, model, args.num_clips, args.num_crops, args.threed_data)
+
+                predicted = output.cpu().numpy()[0][0] * -3000.0
+                print(video, predicted)
+                
+                image_stack.clear()
+            
+            f_res.write("{} {}\n".format(i, predicted))
+
+
+            # Convert PIL Image to OpenCV format
+            img_cv = np.array(img)
+
+            # Write predicted label on the image
+            cv2.putText(img_cv, str(predicted), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255), 2, cv2.LINE_AA)
+            # cv2.imwrite('images/output.png', img_cv)          
+            img_np = np.array(img_cv)
+
+            # Write the numpy array to a .raw file
+            with open(output_name, 'ab') as raw_file:
+                img_np.tofile(raw_file)        
+        cmd = f"ffmpeg -y -s 640x512 -pix_fmt gray -r 30 -i {output_name} -c:v libx264 \
+                -pix_fmt yuv420p {output_name.replace('yuv', 'mp4')}; rm {output_name}"
+        os.system(cmd)
+        f.close()
+        f_res.close()
+
+
+def test_both(videos, model_cls, model_depth, args):
+    
+    model_cls = model_cls.cuda()
+    model_cls.eval()
+
+
+    model_depth = model_depth.cuda()
+    model_depth.eval()
+
+
+    mean = model_cls.mean(args.modality)
+    std = model_cls.std(args.modality)
+    augmentor = get_augmentor(False, args.input_size, scale_range=args.scale_range, mean=mean,
+                                std=std, disable_scaleup=args.disable_scaleup,
+                                threed_data=args.threed_data,
+                                is_flow=True if args.modality == 'flow' else False,
+                                version=args.augmentor_ver)
+    label ={ 0: 'Incompelement_Penetration', 1: 'Normal_Penetration', 2: 'Over_Penetration', 3: 'black', -1 : 'unkown'}
+    for video in videos:
+        f =  open(video, 'rb') 
+
+        f_res = open(os.path.join('images', os.path.basename(video.replace('.raw', '_both.txt'))), 'w')
+        output_name = os.path.join('images', os.path.basename(video.replace('.raw', '_both.yuv')))
+
+        image_stack = []
+        i = 0
+        predicted = 0
+        depth = 0
+        while True:
+            bytes = f.read(640*512)
+            if not bytes:
+                break
+            img = Image.frombytes('L', (640, 512), bytes)
+            i += 1
+            # if i % 4 == 0:
+            #     image_stack.append(img)
+            image_stack.append(img)
+            if len(image_stack) == 8:
+
+                imgs = augmentor(image_stack)
+                imgs.unsqueeze_(0)
+
+                imgs = imgs.cuda()
+                output = eval_a_batch(imgs, model_cls, args.num_clips, args.num_crops, args.threed_data)
+                _, predicted = torch.max(output.data, 1)
+
+                predicted = predicted.cpu().numpy()[0]
+
+                if predicted == 0:
+                    output = eval_a_batch(imgs, model_depth, args.num_clips, args.num_crops, args.threed_data)
+                    depth = output.cpu().numpy()[0][0] * -3000.0
+                else:
+                    depth = 0
+                print(video, predicted, depth)
+                
+                image_stack.clear()
+            
+            f_res.write("{} {} {}\n".format(i, predicted, depth))
+
+
+            # Convert PIL Image to OpenCV format
+            img_cv = np.array(img)
+
+            # Write predicted label on the image
+            cv2.putText(img_cv, f'{label[predicted]} / {depth}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255), 2, cv2.LINE_AA)
+            # cv2.imwrite('images/output.png', img_cv)          
+            img_np = np.array(img_cv)
+
+            # Write the numpy array to a .raw file
+            with open(output_name, 'ab') as raw_file:
+                img_np.tofile(raw_file)        
+        cmd = f"ffmpeg -y -s 640x512 -pix_fmt gray -r 30 -i {output_name} -c:v libx264 \
+                -pix_fmt yuv420p {output_name.replace('yuv', 'mp4')}; rm {output_name}"
+        os.system(cmd)
+        f.close()
+        f_res.close()
 
 if __name__ == '__main__':
 
-    global args
     parser = arg_parser()
     args = parser.parse_args()
-
-    args.num_classes = 4
+  
     
     # 遍历‘data/test_2500’中的文件， 找到*.raw文件， 输出该文件所在完整路径
     v_path = os.path.join('data', 'test_2500')
@@ -181,8 +300,22 @@ if __name__ == '__main__':
     for line in videos:
         print(line)
     
-    model = create_model(args)
+    
 
+    if args.type == 'class':
+        model = create_model(args, 4)
+        test_cls(videos, model, args)
+    elif args.type == 'regression':
+        model = create_model(args, 1)
+        test_depth(videos, model, args)
+    elif args.type == 'both':
+        args.pretrained = 'snapshots/laser_welding-gray-TAM-b3-sum-resnet-18-f8-multisteps-bs16-e50_20240610_161355/checkpoint.pth.tar'
+        model_cls = create_model(args, 4)
+        args.pretrained = 'snapshots/laser_welding_depth-gray-TAM-b3-sum-resnet-18-f8-multisteps-bs16-e50_20240610_161701/checkpoint.pth.tar'
+        model_depth = create_model(args, 1)
+        test_both(videos, model_cls, model_depth, args)
 
-    test_videos(videos, model, args)
+    else:
+        print('Unknown type')
+        exit(1)
     

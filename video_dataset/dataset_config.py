@@ -66,6 +66,7 @@ DATASET_CONFIG = {
         'num_classes': 1,
         'train_list_name': 'train_depth.txt',
         'val_list_name': 'val_depth.txt',
+        'test_list_name': 'val_depth.txt',
         'filename_seperator': " ",
         'image_tmpl': '{:05d}.png',
         'filter_video': 0

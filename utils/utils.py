@@ -57,7 +57,7 @@ def accuracy(output, target, topk=(1, 2)):
 def distance(output, target, norm = -2500.0):
     """Computes the precision@k for the specified values of k"""
     with torch.no_grad():
-        res = torch.abs((output - target)* norm)
+        res = torch.mean(torch.abs((output - target)* norm))
         return res
 
 def save_checkpoint(state, is_best, filepath=''):
@@ -88,25 +88,25 @@ def get_augmentor(is_train, image_size, mean=None,
             ]
         elif version == 'v3':
             augments += [
-                GroupCenterCrop(512),
                 GroupRandomScale(scale_range),
-                GroupCenterCrop(224),
+                GroupCenterCrop(image_size),
             ]
         elif version == 'v4':
             augments += [
                 GroupScale(image_size),
+                GroupCenterCrop(image_size),
             ]
         augments += [GroupRandomHorizontalFlip(is_flow=is_flow)]
     else:
         if version == 'v3':
             augments += [
-                GroupCenterCrop(512),
-                GroupRandomScale(scale_range),
-                GroupCenterCrop(224),
+                GroupScale(image_size),
+                GroupCenterCrop(image_size),
             ]
         elif version == 'v4':
             augments += [
                 GroupScale(image_size),
+                GroupCenterCrop(image_size),
             ]
         else:
             scaled_size = image_size if disable_scaleup else int(image_size / 0.875 + 0.5)
@@ -209,6 +209,7 @@ def train(data_loader, model, criterion, optimizer, epoch, display=100,
 
 
 def validate(data_loader, model, criterion, gpu_id=None):
+    print('validate')
     batch_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
@@ -279,7 +280,7 @@ def train_regression(data_loader, model, criterion, optimizer, epoch, display=10
     end = time.time()
     num_batch = 0
 
-    norm = -2500.0
+    norm = -3000.0
 
     with tqdm(total=len(data_loader)) as t_bar:
         for i, (images, target) in enumerate(data_loader):
@@ -292,12 +293,14 @@ def train_regression(data_loader, model, criterion, optimizer, epoch, display=10
             output = model(images)
             
 
-            # output = output.view(-1)
-            output = torch.sigmoid(output).view(-1)
+            output = output.view(-1)
+            # output = torch.sigmoid(output).view(-1)
             target = target.cuda(gpu_id, non_blocking=True)
             target = target / norm
 
-            loss = criterion(output/target, target/target) 
+            loss = criterion(output, target)
+            # loss = criterion(output/target, target/target) 
+            # print('loss:', loss.item(), 'output:', output/target, 'target:', target/target)
 
             # measure accuracy and record loss
             prec1 = distance(output, target, norm)
@@ -311,8 +314,8 @@ def train_regression(data_loader, model, criterion, optimizer, epoch, display=10
                 prec5 /= world_size
 
             losses.update(loss.item(), images.size(0))
-            top1.update(prec1[0], images.size(0))
-            top5.update(prec5[0], images.size(0))
+            top1.update(prec1, images.size(0))
+            top5.update(prec5, images.size(0))
             # compute gradient and do SGD step
             loss.backward()
 
@@ -343,6 +346,7 @@ def train_regression(data_loader, model, criterion, optimizer, epoch, display=10
 
 
 def validate_regression(data_loader, model, criterion, gpu_id=None):
+    print('validate_regression')
     batch_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
@@ -353,11 +357,17 @@ def validate_regression(data_loader, model, criterion, gpu_id=None):
 
     all_preds = []
     all_labels = []    
-    norm = -2500.0      
+    norm = -3000.0      
 
     with torch.no_grad(), tqdm(total=len(data_loader)) as t_bar:
         end = time.time()
         for i, (images, target) in enumerate(data_loader):
+            
+            # # 将images 转为numpy，取最后一张图，保存为文件
+            # save = images.cpu().numpy()
+            # save = save[-1]
+            # np.save('save_train.npy', save)
+
 
             if gpu_id is not None:
                 images = images.cuda(gpu_id, non_blocking=True)
@@ -367,26 +377,31 @@ def validate_regression(data_loader, model, criterion, gpu_id=None):
             # compute output
             output = model(images)
             
-            # output = output.view(-1)
-            output = torch.sigmoid(output).view(-1)
+            output = output.view(-1)
+            # output = torch.sigmoid(output).view(-1)
             target = target.cuda(gpu_id, non_blocking=True)
+
             target = target / norm
 
-            loss = criterion(output, target)
+            loss = criterion(output, target) 
+            # print(output, target, loss.item())
+            # loss = criterion(output/target, target/target) 
 
             # measure accuracy and record loss
             prec1 = distance(output, target, norm)
+            # print('prec1:', prec1)
             prec5 = prec1 # 无效
 
             if dist.is_initialized():
+                # print("dist.is_initialized()")
                 world_size = dist.get_world_size()
                 dist.all_reduce(prec1)
                 dist.all_reduce(prec5)
                 prec1 /= world_size
                 prec5 /= world_size
             losses.update(loss.item(), images.size(0))
-            top1.update(prec1[0], images.size(0))
-            top5.update(prec5[0], images.size(0))
+            top1.update(prec1, images.size(0))
+            top5.update(prec5, images.size(0))
 
             # measure elapsed time
             batch_time.update(time.time() - end)
@@ -396,6 +411,7 @@ def validate_regression(data_loader, model, criterion, gpu_id=None):
 
             all_preds.extend(output.cpu().numpy())
             all_labels.extend(target.cpu().numpy())
+            # print('avg:', losses.avg, 'count:', losses.count)
     
     
     diff = np.abs((np.array(all_labels) - np.array(all_preds)) * norm)

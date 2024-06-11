@@ -294,21 +294,27 @@ class VideoDataSet(data.Dataset):
         
         # print(record.path,  record.video_id, record.start_frame, record.end_frame, record.label)
         # print(indices)
+        idx = []
         for seg_ind in indices:
             for i in range(self.num_consecutive_frames):
                 new_seg_ind = min(seg_ind + record.start_frame - 1 + i, record.end_frame)
-                # print(new_seg_ind)
-                seg_imgs = self._load_image(record.path, new_seg_ind)
+                seg_imgs = self._load_image(record.path, new_seg_ind)       
+                idx.append(new_seg_ind)
                 images.extend(seg_imgs)
 
+                # if not self.is_train:
+                #     print(new_seg_ind)  
+                #     print(seg_imgs[0].size) 
 
+        # print(idx)11
         # for image in images:
         #     plt.figure("original image")
         #     plt.imshow(image)
         #     plt.show()
 
         images = self.transform(images)
-
+        # np.save('images_64.npy', images.numpy())
+        
         
         # 显示 images
         # grid = torchvision.utils.make_grid(images.transpose(0,1), nrow=2)
@@ -323,12 +329,12 @@ class VideoDataSet(data.Dataset):
         #     label = int(record.video_id)
         # else:
         #     label = int(record.label)
-
+        
         label = int(record.label)
         # re-order data to targeted format.
         h, w = images.size()[-2:]
         images = images.view(-1,h,w )
-
+        
         return images, label
 
     def __len__(self):

@@ -11,7 +11,7 @@ import torchvision.transforms as transforms
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix
 from models import build_model
-from utils.utils import build_dataflow, AverageMeter, accuracy
+from utils.utils import build_dataflow, AverageMeter, accuracy, get_augmentor
 from utils.video_transforms import *
 from video_dataset.video_dataset import VideoDataSet
 from video_dataset.dataset_config import get_dataset_config
@@ -99,7 +99,7 @@ def main():
         print("=> using pre-trained model '{}'".format(arch_name))
         checkpoint = torch.load(args.pretrained, map_location='cpu')
         checkpoint = {k.replace('module.', ''): v for k, v in checkpoint['state_dict'].items()}
-        model.load_state_dict(checkpoint)
+        model.load_state_dict(checkpoint, strict=True)
     else:
         print("=> creating model '{}'".format(arch_name))
 
@@ -111,25 +111,11 @@ def main():
     else:
         scale_size = int(args.input_size / 0.875 + 0.5)
 
-    augments = []
-    if args.num_crops == 1:
-        augments += [
-            GroupCenterCrop(512),
-            GroupScale(scale_size),
-            GroupCenterCrop(scale_size),
-        ]
-    else:
-        flip = True if args.num_crops == 10 else False
-        augments += [
-            GroupOverSample(args.input_size, scale_size, num_crops=args.num_crops, flip=flip),
-        ]
-    augments += [
-        Stack(threed_data=args.threed_data),
-        ToTorchFormatTensor(num_clips_crops=args.num_clips * args.num_crops),
-        GroupNormalize(mean=mean, std=std, threed_data=args.threed_data)
-    ]
-
-    augmentor = transforms.Compose(augments)
+    augmentor = get_augmentor(False, args.input_size, scale_range=args.scale_range, mean=mean,
+                                  std=std, disable_scaleup=args.disable_scaleup,
+                                  threed_data=args.threed_data,
+                                  is_flow=True if args.modality == 'flow' else False,
+                                  version=args.augmentor_ver)
 
     # Data loading code
     data_list = os.path.join(args.datadir, data_list_name)
@@ -173,8 +159,12 @@ def main():
     with torch.no_grad(), tqdm(total=total_batches) as t_bar:
         end = time.time()
         for i, (video, label) in enumerate(data_loader):
+            # save = video.cpu().numpy()
+            # save = save[-1]
+            # np.save('save_test.npy', save)
             output = eval_a_batch(video, model, num_clips=args.num_clips, num_crops=args.num_crops,
                                   threed_data=args.threed_data)
+
             if args.evaluate:
                 label = label.cuda(non_blocking=True)
                 _, predicted = torch.max(output.data, 1)
@@ -210,12 +200,18 @@ def main():
                 output = output.data.cpu().numpy().copy()
                 batch_size = output.shape[0]
                 outputs[total_outputs:total_outputs + batch_size, :] = output
+                
                 predictions = np.argsort(output, axis=1)
-                for ii in range(len(predictions)):
-                    # preds = [id_to_label[str(pred)] for pred in predictions[ii][::-1][:5]]
-                    temp = predictions[ii][::-1][:2]
-                    preds = [str(pred) for pred in temp]
-                    print("{},{}".format(str(label[ii].numpy()), ",".join(preds)), file=logfile)
+                if args.type == 'regression':
+                    # print("{},{},{}".format(str(label.numpy()), str(output),  str(output * -3000.0), file=logfile))
+                    all_preds.extend(output[0] * -3000.0)
+                    all_labels.append(label.numpy())
+                else:
+                    for ii in range(len(predictions)):
+                        # preds = [id_to_label[str(pred)] for pred in predictions[ii][::-1][:5]]
+                        temp = predictions[ii][::-1][:2]
+                        preds = [str(pred) for pred in temp]
+                        print("{},{}".format(str(label[ii].numpy()), ",".join(preds)), file=logfile)
             total_outputs += video.shape[0]
             batch_time.update(time.time() - end)
             end = time.time()
@@ -240,7 +236,9 @@ def main():
         print('Confusion Matrix:')
         print(cm)
         print(cm, file=logfile)
-
+    # print(all_labels, all_preds)
+    if args.type == 'regression':
+        print("avg depth:", np.mean(np.abs(np.array(all_labels).reshape(-1) - np.array(all_preds).reshape(-1))))
     logfile.close()
 
 if __name__ == '__main__':

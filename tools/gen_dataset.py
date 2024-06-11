@@ -123,12 +123,19 @@ def split_trainval_random(lines, ext):
         path = os.path.join('images', items[0], f'{start:05d}.png')
         if os.path.exists(path):
             new_lines.append(line)
+        else:
+            print(f"remove {line}")
     print(f"valid {len(new_lines)} lines", f" in Total {len(lines)} lines")
     # lines 随机打乱， 前80%作为训练集， 后20%作为验证集
+    
     random.shuffle(new_lines)
+
     ratio = 0.9
-    train = lines[:int(len(lines)*ratio)]
-    val = lines[int(len(lines)*ratio):]
+    train = new_lines[:int(len(new_lines)*ratio)]
+    val = new_lines[int(len(new_lines)*ratio):]
+
+    train.sort()
+    val.sort()
     with open(f"images/train_{ext}.txt", 'w') as f:
         for item in train:
             f.write("%s\n" % item)
@@ -166,7 +173,7 @@ if __name__ == "__main__":
     all_khd = get_all_lines('images', 'KHD.txt')
     all_pene = get_all_lines('images', 'penetration.txt')
     black_list = get_black_lines('images', 'black_sample')
-    split_trainval(all_pene + black_list, 'penetration')
+    # split_trainval(all_pene + black_list, 'penetration')
 
     all_khd_filter = filter_khd_info(all_khd)
 

@@ -71,6 +71,7 @@ def main_worker(gpu, ngpus_per_node, args):
         args.input_channels = 1
 
     model, arch_name = build_model(args)
+
     mean = model.mean(args.modality)
     std = model.std(args.modality)
 
@@ -111,7 +112,15 @@ def main_worker(gpu, ngpus_per_node, args):
         if args.rank == 0:
             print("=> using pre-trained model '{}'".format(arch_name))
         checkpoint = torch.load(args.pretrained, map_location='cpu')
-        model.load_state_dict(checkpoint['state_dict'], strict=False)
+
+        # 创建一个新的state_dict，其键名没有'module.'前缀
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in checkpoint['state_dict'].items():
+            name = k[7:]  # 删除'module.'前缀
+            new_state_dict[name] = v
+
+        model.load_state_dict(new_state_dict, strict=True)
         del checkpoint  # dereference seems crucial
         torch.cuda.empty_cache()
     else:
@@ -217,8 +226,7 @@ def main_worker(gpu, ngpus_per_node, args):
     train_list = os.path.join(args.datadir, train_list_name)
 
     train_augmentor = get_augmentor(True, args.input_size, scale_range=args.scale_range, mean=mean,
-                                    std=std,
-                                    disable_scaleup=args.disable_scaleup,
+                                    std=std, disable_scaleup=args.disable_scaleup,
                                     threed_data=args.threed_data,
                                     is_flow=True if args.modality == 'flow' else False,
                                     version=args.augmentor_ver)

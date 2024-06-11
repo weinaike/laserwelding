@@ -1,0 +1,70 @@
+import os
+import pandas as pd
+from scipy.interpolate import interp1d
+import numpy as np
+import matplotlib.pyplot as plt
+if __name__ == '__main__':
+    
+    # 遍历‘data/test_2500’中的文件， 找到*.raw文件， 输出该文件所在完整路径
+    v_path = os.path.join('data', 'test_2500')
+    
+    videos = []
+    # 遍历images目录中的所有文件
+    for root, dirs, files in os.walk(v_path):
+        for file in files:
+            if file.endswith('.raw'):
+                videos.append(os.path.join(root, file))
+    for line in videos:
+        dir = os.path.dirname(line)
+        name = os.path.basename(line)
+
+        result = []
+        with open(os.path.join('images', name.replace('.raw', '_both.txt'))) as f:
+            predicts = f.readlines()
+            for pred in predicts:
+                item = pred.strip().split(' ')
+                id = int(item[0])
+                label = int(item[1])
+                depth = float(item[2])
+                if id < 100:
+                    continue
+                elif id > 999:
+                    continue
+                else:
+                    result.append([id, label, depth])      
+        result = np.array(result)
+
+        frames = result[:, 0] /200 *16.6667 *1000
+        # result : 0: distance, 1: label, 2: depth, 3: KHD
+        # 获取该目录下 KHD.txt后缀文件
+        for filename in os.listdir(dir):
+            if filename.endswith('KHD.csv'):
+                csv_file = os.path.join(dir, filename)
+                df = pd.read_csv(csv_file, usecols=[0, 1])
+                # print(df.head())
+                # 截取第一列数据，数值范围在1000-8300之间的数据
+                df = df[(df['Keyhole Depth X (um)'] >= 500) & (df['Keyhole Depth X (um)'] <= 90000)]
+                #读取该文件的所有行
+                x = df['Keyhole Depth X (um)']
+                y = df['Keyhole Depth Z (um)']
+
+                f = interp1d(x, y)
+                new_y = f(frames).reshape(-1, 1)
+                result = np.concatenate((result, new_y), axis=1)
+        
+        
+        fig, ax1 = plt.subplots(figsize=(10, 6))        
+        plt.title(name)
+        ax1.plot(frames, result[:, 3], label='LDD KHD Data', color='b', linestyle=':')
+        ax1.plot(frames, result[:, 2], label='Depth Predict', color='g')        
+        ax1.set_ylabel('Penetration Depth', color='g')
+        ax1.set_xlabel('Distance')
+        ax2 = ax1.twinx()
+        ax2.plot(frames, result[:, 1], label='Penetration_Status\n0: Incomplement Penetration\n1: Normal Penetration\n2: Over Penetration\n3: Unkown (No Info) Status', color='r')
+        ax2.set_ylim([0, 3])
+        plt.yticks(np.arange(-1, 5, 1))
+        ax2.set_ylabel('Penetration Status Predict', color='r')
+        fig.legend()
+        plt.savefig(os.path.join('images', name.replace('.raw', '.png')))
+        plt.close()
+

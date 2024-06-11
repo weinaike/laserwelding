@@ -94,7 +94,81 @@ def gen_depth_labels(v_lists, image_paths, output, param:dict):
     f_khd.close()
     f_pene.close()
 
+
+
+def gen_stable_labels(v_lists, image_paths, output, param:dict):
+
+    depth = param['thickness']
+    frames = param['frams']
+    speed = param['speed']
+    fps = param['fps']
     
+    stable_name = output + "/stable.txt"
+    f_stable = open(stable_name, 'w')
+    f_pene = open(pene_name, 'w')
+    
+    for i in range(len(v_lists)):
+        # 提取v文件所在的目录
+        path = os.path.dirname(v_lists[i])
+        csv_file = ''
+        # 读取path文件夹下，以 "_KHD.csv"结尾的文件
+        for file in os.listdir(path):
+            if file.endswith('_KHD.csv'):
+                csv_file = os.path.join(path, file)
+        # 读取CSV文件
+        df = pd.read_csv(csv_file, usecols=[0, 1])
+        # 截取第一列数据，数值范围在1000-8300之间的数据
+        df = df[(df['Keyhole Depth X (um)'] >= 500) & (df['Keyhole Depth X (um)'] <= 90000)]
+        
+        start = int(fps * 0.5) # 0.5s * 200fps
+        step = 32
+        end = frames # 999
+
+        for j in range(start, end - step, step):
+            s = j / fps * speed * 1000
+            e = (j + step) / fps * speed * 1000
+            vals =  df[(df['Keyhole Depth X (um)'] >= s) & (df['Keyhole Depth X (um)'] <= e)]
+
+            if vals.empty:
+                print(path, s, e, "empty")
+                continue                
+            else:                
+
+                value = int(vals.iloc[:,1].min())
+                line = f'{image_paths[i]} {j} {j + step} {value}\n'
+                f_khd.write(line)
+
+
+                ## 标签判断
+                if 'Incomplete_Penetration' in v_lists[i]:
+                    if(value > depth): #未熔透
+                        pene_label = 0
+                    else:
+                        pene_label = value                        
+                elif 'Small_Penetration' in v_lists[i]:
+                    if value > depth + 250:
+                        pene_label = 0
+                    elif value < depth - 256:
+                        pene_label = 1
+                    else:
+                        pene_label = value # 保留原值
+                elif 'Normal_Penetration' in v_lists[i]: # 熔透与过熔透
+                    if value < depth:     # 熔透状态
+                        pene_label = 1
+                    else:
+                        pene_label = value
+                elif "Over_Penetration" in v_lists[i]:
+                    if value < depth:     # 熔透状态
+                        pene_label = 2    # 过熔透状态
+                    else:
+                        pene_label = value
+                    
+                line = f'{image_paths[i]} {j} {j + step} {pene_label}\n'
+                f_pene.write(line)
+
+    f_khd.close()
+    f_pene.close()
+
 
 if __name__ == "__main__":
     # 需要解析图片， 则加上 --image 参数
