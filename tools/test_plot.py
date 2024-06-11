@@ -3,8 +3,10 @@ import pandas as pd
 from scipy.interpolate import interp1d
 import numpy as np
 import matplotlib.pyplot as plt
-if __name__ == '__main__':
-    
+
+
+
+def plot_video_info():
     # 遍历‘data/test_2500’中的文件， 找到*.raw文件， 输出该文件所在完整路径
     v_path = os.path.join('data', 'test_2500')
     
@@ -67,4 +69,39 @@ if __name__ == '__main__':
         fig.legend()
         plt.savefig(os.path.join('images', name.replace('.raw', '.png')))
         plt.close()
+
+
+
+
+def plot_depth_info():
+    csv_file = os.path.join('snapshots', 'laser_welding_depth-gray-TAM-b3-sum-resnet-18-f8', 'test_1crops_1clips_224.csv')
+    result = []
+    with open(csv_file) as f:
+        predicts = f.readlines()
+        
+        for pred in predicts:
+            item = pred.strip().split(',')
+            label = float(item[0])
+            
+            depth = float(item[1])
+            result.append([label, depth])
+    result = np.array(result)
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+    plt.title('Depth Predict')
+    ax1.plot(result[:, 0], label='LDD Data', color='b')
+    ax1.plot(result[:, 1], label='Depth Predict', color='g')
+    ax1.set_ylabel('Penetration Depth', color='g')
+    ax1.legend()
+    plt.savefig(os.path.join('images', 'depth.png'))
+    plt.show()
+    plt.close()
+    
+                          
+
+
+
+if __name__ == '__main__':
+    # plot_video_info()
+    plot_depth_info()    
+
 
