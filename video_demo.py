@@ -89,8 +89,8 @@ def test_cls(videos, model, args):
 
     for video in videos:
         f =  open(video, 'rb') 
-        f_res = open(os.path.join('images', os.path.basename(video.replace('.raw', '.txt'))), 'w')
-        output_name = os.path.join('images', os.path.basename(video.replace('.raw', '.yuv')))
+        f_res = open(os.path.join('result', os.path.basename(video.replace('.raw', '.txt'))), 'w')
+        output_name = os.path.join('result', os.path.basename(video.replace('.raw', '.yuv')))
 
 
         image_stack = []
@@ -156,8 +156,8 @@ def test_depth(videos, model, args):
     for video in videos:
         f =  open(video, 'rb') 
 
-        f_res = open(os.path.join('images', os.path.basename(video.replace('.raw', '_depth.txt'))), 'w')
-        output_name = os.path.join('images', os.path.basename(video.replace('.raw', '_depth.yuv')))
+        f_res = open(os.path.join('result', os.path.basename(video.replace('.raw', '_depth.txt'))), 'w')
+        output_name = os.path.join('result', os.path.basename(video.replace('.raw', '_depth.yuv')))
 
         image_stack = []
         i = 0
@@ -226,8 +226,8 @@ def test_both(videos, model_cls, model_depth, args):
     for video in videos:
         f =  open(video, 'rb') 
 
-        f_res = open(os.path.join('images', os.path.basename(video.replace('.raw', '_both.txt'))), 'w')
-        output_name = os.path.join('images', os.path.basename(video.replace('.raw', '_both.yuv')))
+        f_res = open(os.path.join('result', os.path.basename(video.replace('.raw', '_both.txt'))), 'w')
+        output_name = os.path.join('result', os.path.basename(video.replace('.raw', '_both.yuv')))
 
         image_stack = []
         i = 0

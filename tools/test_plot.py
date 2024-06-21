@@ -21,7 +21,7 @@ def plot_video_info():
         name = os.path.basename(line)
 
         result = []
-        with open(os.path.join('images', name.replace('.raw', '_both.txt'))) as f:
+        with open(os.path.join('result', name.replace('.raw', '_both.txt'))) as f:
             predicts = f.readlines()
             for pred in predicts:
                 item = pred.strip().split(' ')
@@ -67,7 +67,7 @@ def plot_video_info():
         plt.yticks(np.arange(-1, 5, 1))
         ax2.set_ylabel('Penetration Status Predict', color='r')
         fig.legend()
-        plt.savefig(os.path.join('images', name.replace('.raw', '.png')))
+        plt.savefig(os.path.join('result', name.replace('.raw', '.png')))
         plt.close()
 
 
@@ -92,8 +92,7 @@ def plot_depth_info():
     ax1.plot(result[:, 1], label='Depth Predict', color='g')
     ax1.set_ylabel('Penetration Depth', color='g')
     ax1.legend()
-    plt.savefig(os.path.join('images', 'depth.png'))
-    plt.show()
+    plt.savefig(os.path.join('result', 'depth.png'))
     plt.close()
     
                           
@@ -101,7 +100,7 @@ def plot_depth_info():
 
 
 if __name__ == '__main__':
-    # plot_video_info()
+    plot_video_info()
     plot_depth_info()    
 
 
