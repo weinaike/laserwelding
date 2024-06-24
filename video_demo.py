@@ -291,15 +291,14 @@ if __name__ == '__main__':
 
     parser = arg_parser()
     args = parser.parse_args()
-  
-    
-
-    
+      
     videos = []
 
     # 遍历‘data/test_2500’中的文件， 找到*.raw文件， 输出该文件所在完整路径
-    # v_path = os.path.join('data', 'test_2500')
-    v_path = os.path.join('data', 'stable_20240621.txt')
+    v_path = os.path.join('data', 'test_2500')
+    if args.type == 'stable':
+        v_path = os.path.join('data', 'stable_20240621.txt')
+        
     if os.path.isdir(v_path):
         # 遍历images目录中的所有文件
         for root, dirs, files in os.walk(v_path):
