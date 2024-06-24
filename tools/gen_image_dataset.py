@@ -1,7 +1,6 @@
 import os
 from PIL import Image
 import pandas as pd
-from gen_dataset import split_trainval
 import argparse
 import concurrent.futures
 
@@ -23,7 +22,7 @@ def extract_images(v_lists, image_paths):
 def gen_depth_labels(v_lists, image_paths, output, param:dict):
 
     depth = param['thickness']
-    frames = param['frams']
+    frames = param['frames']
     speed = param['speed']
     fps = param['fps']
     
@@ -95,12 +94,56 @@ def gen_depth_labels(v_lists, image_paths, output, param:dict):
     f_pene.close()
 
 
+
+def gen_stable_labels(v_lists, image_paths, output, param:dict,label_file:str):
+    stable_dict = dict()
+    with open(label_file, 'r') as f:
+        lines = f.readlines()
+        for line in lines:
+            line = line.strip()
+            items = line.split(' ')
+            key = os.path.join('data', os.path.dirname(os.path.normpath(items[0])))
+            stable_dict[key] = items[1]
+
+    frames = param['frames'] 
+    fps = param['fps']
+    
+    stable_name = output + "/stable.txt"
+    f_stable = open(stable_name, 'w')
+    
+    for i in range(len(v_lists)):
+        # 提取v文件所在的目录
+        path = os.path.dirname(v_lists[i])
+        if path not in stable_dict:
+            print(f'{path} not in stable_dict')
+            continue
+        label_name = stable_dict[path]
+
+        start = int(fps * 0.5) # 0.5s * 200fps
+        step = 32
+        end = frames # 999
+
+        label_id = -1
+        if label_name == 'stable':
+            label_id = 0
+        elif label_name == 'unstable':
+            label_id = 1
+        elif label_name == 'unknown':
+            label_id = -1
+        
+        for j in range(start, end - step, step):
+            
+            
+            line = f'{image_paths[i]} {j} {j + step} {label_id}\n'
+            f_stable.write(line)
+
+    f_stable.close()
+
+
 if __name__ == "__main__":
     # 需要解析图片， 则加上 --image 参数
-    # 需要生成训练和验证文件，则加上 --trainval 参数
     argparse = argparse.ArgumentParser()
     argparse.add_argument('--image', action='store_true', default=False, help='extract images from video files')
-    argparse.add_argument('--trainval', action='store_true', default=False, help='generate train and val txt file ')
     args = argparse.parse_args()
     
 
@@ -118,7 +161,7 @@ if __name__ == "__main__":
         
         param = dict()
         param['thickness'] = -1 * thick
-        param['frams'] = 999
+        param['frames'] = 999
         param['speed'] = speed
         param['fps'] = 200
         
@@ -128,7 +171,8 @@ if __name__ == "__main__":
         v_lists = []
         for line in lines:
             line = line.strip()
-            video_file = os.path.join('data', dir, line)    
+            line = os.path.normpath(line)
+            video_file = os.path.join('data', dir, line)            
             v_lists.append(video_file)
         
         output = f'images/{dir}'
@@ -151,12 +195,9 @@ if __name__ == "__main__":
         if args.image:
             extract_images(v_lists, image_paths)
         
-        if True:
-            gen_depth_labels(v_lists, image_paths, output, param)
+        gen_depth_labels(v_lists, image_paths, output, param)
+        gen_stable_labels(v_lists, image_paths, output, param, 'data/stable_20240621.txt')
 
-        if args.trainval:
-            pene_name = output + "/penetration.txt"
-            split_trainval(pene_name, dir)
 
 
 

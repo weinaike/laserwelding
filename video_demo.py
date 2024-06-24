@@ -86,6 +86,8 @@ def test_cls(videos, model, args):
 
 
     label ={ 0: 'Incompelement_Penetration', 1: 'Normal_Penetration', 2: 'Over_Penetration', 3: 'black', -1 : 'unkown'}
+    if args.type == 'stable':
+        label = { 0: 'stable', 1: 'unstable', -1 : 'unkown'}
 
     for video in videos:
         f =  open(video, 'rb') 
@@ -102,10 +104,12 @@ def test_cls(videos, model, args):
                 break
             img = Image.frombytes('L', (640, 512), bytes)
             i += 1
-            # if i % 4 == 0:
-            #     image_stack.append(img)
-            image_stack.append(img)
-            if len(image_stack) == 8:
+            if i % args.frames_per_group == 0:
+                image_stack.append(img)
+
+            
+            
+            if len(image_stack) == args.groups:
 
                 imgs = augmentor(image_stack)
                 imgs.unsqueeze_(0)
@@ -115,7 +119,7 @@ def test_cls(videos, model, args):
                 _, predicted = torch.max(output.data, 1)
 
                 predicted = predicted.cpu().numpy()[0]
-                print(video, predicted)
+                print(video, i, predicted)
                 
                 image_stack.clear()
 
@@ -136,6 +140,7 @@ def test_cls(videos, model, args):
         os.system(cmd)
         f.close()
         f_res.close()
+
 
 
 def test_depth(videos, model, args):
@@ -168,10 +173,10 @@ def test_depth(videos, model, args):
                 break
             img = Image.frombytes('L', (640, 512), bytes)
             i += 1
-            # if i % 4 == 0:
-            #     image_stack.append(img)
-            image_stack.append(img)
-            if len(image_stack) == 8:
+            if i % args.frames_per_group == 0:
+                image_stack.append(img)
+
+            if len(image_stack) == args.groups:
 
                 imgs = augmentor(image_stack)
                 imgs.unsqueeze_(0)
@@ -239,10 +244,10 @@ def test_both(videos, model_cls, model_depth, args):
                 break
             img = Image.frombytes('L', (640, 512), bytes)
             i += 1
-            # if i % 4 == 0:
-            #     image_stack.append(img)
-            image_stack.append(img)
-            if len(image_stack) == 8:
+            if i % args.frames_per_group == 0:
+                image_stack.append(img)
+
+            if len(image_stack) == args.groups:
 
                 imgs = augmentor(image_stack)
                 imgs.unsqueeze_(0)
@@ -288,15 +293,30 @@ if __name__ == '__main__':
     args = parser.parse_args()
   
     
-    # 遍历‘data/test_2500’中的文件， 找到*.raw文件， 输出该文件所在完整路径
-    v_path = os.path.join('data', 'test_2500')
+
     
     videos = []
-    # 遍历images目录中的所有文件
-    for root, dirs, files in os.walk(v_path):
-        for file in files:
-            if file.endswith('.raw'):
-                videos.append(os.path.join(root, file))
+
+    # 遍历‘data/test_2500’中的文件， 找到*.raw文件， 输出该文件所在完整路径
+    # v_path = os.path.join('data', 'test_2500')
+    v_path = os.path.join('data', 'stable_20240621.txt')
+    if os.path.isdir(v_path):
+        # 遍历images目录中的所有文件
+        for root, dirs, files in os.walk(v_path):
+            for file in files:
+                if file.endswith('.raw'):
+                    videos.append(os.path.join(root, file))
+    else:
+        with open(v_path, 'r') as f:
+            lines = f.readlines()
+        for line in lines:
+            line = line.strip()
+            items = line.split(' ')
+            if items[1] != 'unknown':
+                continue
+            if items[0].endswith('.raw'):
+                videos.append(os.path.join('data', items[0]))
+
     for line in videos:
         print(line)
     
@@ -315,7 +335,7 @@ if __name__ == '__main__':
         model_depth = create_model(args, 1)
         test_both(videos, model_cls, model_depth, args)
 
-    else:
-        print('Unknown type')
-        exit(1)
+    else:# for stable
+        model = create_model(args, 2)
+        test_cls(videos, model, args)
     

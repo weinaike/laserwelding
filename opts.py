@@ -126,6 +126,6 @@ def arg_parser():
     parser.add_argument('--debug', action='store_true', help='debug info')
     parser.add_argument('--criterion', default='softmax', type=str, choices=['softmax', 'L1', 'MSE'],
                         help='[v1] TSN data argmentation, [v2] resize the shorter side to `scale_range`')
-    parser.add_argument('--type', default='class', type=str, choices=['class', 'regression', 'both'],
+    parser.add_argument('--type', default='class', type=str, choices=['class', 'regression', 'both', 'stable'],
                         help='[only ro test for video] class for classification, regression for regression, all for both')    
     return parser

@@ -8,8 +8,7 @@
 
 ```python
 # 需要解析图片(从raw视频生成png图片)， 则加上 --image 参数
-# 需要生成训练和验证文件，则加上 --trainval 参数
-python tools/gen_image_dataset.py --image --trainval
+python tools/gen_image_dataset.py --image 
 
 # 内部主要执行的是gen_depth_labels函数
 ```

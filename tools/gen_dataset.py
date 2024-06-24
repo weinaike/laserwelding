@@ -2,16 +2,8 @@
 import random
 import os
 
-def split_trainval(f_pene, ext):
-    # 判断 f_pene 的类型， 是字符串，还是list
-    lines = []
-    if isinstance(f_pene, str):
-        f = open(f_pene, 'r')
-        lines = f.readlines()
-        f.close()
-    elif isinstance(f_pene, list):
-        lines = f_pene
-
+def split_trainval_count(lines, ext, val_num = 30):  
+    random.seed(42)
     samples = dict()
     unknown = list()
     for line in lines:
@@ -34,7 +26,7 @@ def split_trainval(f_pene, ext):
     # 随机打乱
     train = []
     val = []
-    val_num = 30
+    # val_num = 30
     for key in samples.keys():
         num = len(samples[key])
         random.shuffle(samples[key])            # 随机选取，测试用例在训练集中全覆盖， 样本覆盖不全，效果会差（说明训练素材量还不足）
@@ -42,7 +34,6 @@ def split_trainval(f_pene, ext):
         val += samples[key][(num-val_num):]
     
     with open(f"images/train_{ext}.txt", 'w') as f:
-        random.shuffle(train)                   # 随机打乱
         for item in train:
             # 字符串中去掉开头的 'images/' 
             item = item[7:]
@@ -113,7 +104,36 @@ def filter_khd_info(lines):
     
     return result
 
-def split_trainval_random(lines, ext):
+
+def filter_stable_info(lines):
+
+    with open(f"images/stable_all.txt", 'w') as f:
+        for item in lines:
+            f.write("%s\n" % item.strip()) 
+
+    result = []
+    unknown = []
+    for line in lines:
+        line = line[7:] 
+        line = line.strip()
+        items = line.split(' ')
+        if len(items) < 2:
+            continue
+        if int(items[-1]) < 0:
+            unknown.append(line)
+        else:
+            result.append(line)                
+    with open(f"images/stable_filter.txt", 'w') as f:
+        for item in result:
+            f.write("%s\n" % item)
+    with open(f"images/stable_unknown.txt", 'w') as f:
+        for item in unknown:
+            f.write("%s\n" % item)
+    
+    return result
+
+def split_trainval_ratio(lines, ext, val_ratio = 0.1):
+    random.seed(42)
     # 遍历 lines 中所有的行， 判断图片文件是否存在， 如果不存在， 则删除这一行
     new_lines = []
     for line in lines:
@@ -130,7 +150,7 @@ def split_trainval_random(lines, ext):
     
     random.shuffle(new_lines)
 
-    ratio = 0.9
+    ratio = 1 - val_ratio
     train = new_lines[:int(len(new_lines)*ratio)]
     val = new_lines[int(len(new_lines)*ratio):]
 
@@ -172,9 +192,13 @@ if __name__ == "__main__":
     black_list = get_black_lines('images', 'black_sample')
     all_khd = get_all_lines('images', 'KHD.txt')
     all_pene = get_all_lines('images', 'penetration.txt')
+    all_stable = get_all_lines('images', 'stable.txt')
     black_list = get_black_lines('images', 'black_sample')
-    # split_trainval(all_pene + black_list, 'penetration')
+    # split_trainval_count(all_pene + black_list, 'penetration', val_num = 30)
 
     all_khd_filter = filter_khd_info(all_khd)
+    split_trainval_ratio(all_khd_filter, 'depth', val_ratio = 0.1)
 
-    split_trainval_random(all_khd_filter, 'depth')
+
+    all_stable_filter = filter_stable_info(all_stable)
+    split_trainval_ratio(all_stable_filter, 'stable', val_ratio = 0.1)

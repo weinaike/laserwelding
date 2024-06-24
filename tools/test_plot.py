@@ -94,13 +94,97 @@ def plot_depth_info():
     ax1.legend()
     plt.savefig(os.path.join('result', 'depth.png'))
     plt.close()
+
+
+def plot_stable(x, fws, tre, tle, lx, predicts, name, status=-1):
     
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+    plt.title(name.replace('.txt', ' Stable Status') )
+    ax1.plot(x, fws, label='LDD FWS', color='g')
+    ax1.plot(x, tre, label='LDD TRE', color='r')
+    ax1.plot(x, tle, label='LDD TLE', color='b')
+    ax1.set_xlabel('Distance')
+    ax1.set_ylabel('um')
+    ax2 = ax1.twinx()
+    ax2.plot(lx, predicts, label='Stable Status\n-1: unknown\n 0: stable\n 1: unstable', color='y')
+    ax2.set_ylabel('Stable Status', color='y')
+    ax2.set_ylim([-1, 2])
+    plt.yticks(np.arange(-1, 2, 1))
+
+
+    fig.legend()
+    plt.savefig(os.path.join('result', name.replace('.txt', f'_stable_{status}.png')))
+    plt.close()
+
+
                           
+def plot_stable_info():
+    v_path = os.path.join('data', 'stable_20240621.txt')
+
+    videos = dict()
+    knows = dict()
+    with open(v_path, 'r') as f:
+        lines = f.readlines()
+    for line in lines:
+        line = line.strip()
+        items = line.split(' ')
+        if items[1] != 'unknown':
+            dir = items[0].split('/')[-2]
+            if items[1] == 'stable':
+                knows[dir] = 0
+            else:
+                knows[dir] = 1            
+        else:
+            name = os.path.basename(items[0].replace('.raw', '.txt'))
+            dir = items[0].split('/')[-2]
+            videos[name] = dir
+
+    for name, dir in videos.items():
+        result = os.path.join('result', name)
+        ldd = os.path.join('data', 'stable',  f'{dir}_all.csv')
+        if not os.path.exists(ldd):
+            continue
+
+        df = pd.read_csv(ldd)
+        x = df['x']
+        fws = df['FWS']
+        tre = df['TRE']
+        tle = df['TLE']
+
+        id = []
+        predicts = []
+        with open(result) as f:
+            ress = f.readlines()
+            for res in ress:
+                item = res.strip().split(' ')
+                id.append(int(item[0]))
+                predicts.append(int(item[1]))
+                
+        id = np.array(id)
+        predicts = np.array(predicts)
+
+        lx = id /200 *16.6667 *1000
+        plot_stable(x, fws, tre, tle, lx, predicts, name)
 
 
+    for dir , status in knows.items():
+        ldd = os.path.join('data', 'stable',  f'{dir}_all.csv')
+        if not os.path.exists(ldd):
+            continue
+        df = pd.read_csv(ldd)
+        x = df['x']
+        fws = df['FWS']
+        tre = df['TRE']
+        tle = df['TLE']
+
+        lx = np.array([0,90000]) 
+        predicts = np.array([int(status), int(status)])
+
+        plot_stable(x, fws, tre, tle, lx, predicts, f'{dir}.txt', status=status)
 
 if __name__ == '__main__':
-    plot_video_info()
-    plot_depth_info()    
+    # plot_video_info()
+    # plot_depth_info()
+    plot_stable_info()
 
 
