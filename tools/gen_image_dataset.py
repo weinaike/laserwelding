@@ -42,23 +42,24 @@ def gen_depth_labels(v_lists, image_paths, output, param:dict):
         # 读取CSV文件
         df = pd.read_csv(csv_file, usecols=[0, 1])
         # 截取第一列数据，数值范围在1000-8300之间的数据
-        df = df[(df['Keyhole Depth X (um)'] >= 500) & (df['Keyhole Depth X (um)'] <= 90000)]
+        df = df[(df['Keyhole Depth X (um)'] >= 500) & (df['Keyhole Depth X (um)'] <= 990000)]
         
         start = int(fps * 0.5) # 0.5s * 200fps
         step = 32
         end = frames # 999
 
         for j in range(start, end - step, step):
-            s = j / fps * speed * 1000
-            e = (j + step) / fps * speed * 1000
+            s = j / fps * speed * 1000.0
+            e = (j + step) / fps * speed * 1000.0
             vals =  df[(df['Keyhole Depth X (um)'] >= s) & (df['Keyhole Depth X (um)'] <= e)]
 
             if vals.empty:
-                print(path, s, e, "empty")
+                print(path, j, s, e, "empty")
                 continue                
             else:                
 
                 value = int(vals.iloc[:,1].min())
+                # if value < depth + 250:
                 line = f'{image_paths[i]} {j} {j + step} {value}\n'
                 f_khd.write(line)
 
@@ -72,7 +73,7 @@ def gen_depth_labels(v_lists, image_paths, output, param:dict):
                 elif 'Small_Penetration' in v_lists[i]:
                     if value > depth + 250:
                         pene_label = 0
-                    elif value < depth - 256:
+                    elif value < depth - 250:
                         pene_label = 1
                     else:
                         pene_label = value # 保留原值
@@ -146,22 +147,27 @@ if __name__ == "__main__":
     argparse.add_argument('--image', action='store_true', default=False, help='extract images from video files')
     args = argparse.parse_args()
     
-
-    data_list = [['20240603_2500', 16.667 ], 
-                 ['20240605_1900', 16.667 ], 
-                 ['20240605_2500', 16.667 ], 
+    #              ['20240603_2500', 16.667 , 1000], 
+    #              ['20240605_1900', 16.667 , 1000], 
+    #              ['20240605_2500', 16.667 , 1200], 
+    data_list = [['20240722_2500', 16.667 , 1200], 
+                 ['20240722_3500_MAG', 25.0 , 1200], 
+                 ['20240722_4500_MAG', 25.0 , 1200], 
+                 ['20240722_5500', 8.333 , 1200], 
+                 ['20240722_5500_MAG', 25.0, 1200], 
+                 ['20240722_7500_MAG', 16.667 , 1500], 
                 ]
     for data in data_list:
-        dir, speed = data
+        dir, speed, frames = data
 
         items = dir.split('_')
         thick = 2500
-        if len(items) == 2:
-            thick = int(dir.split('_')[-1])
+        if len(items) >= 2:
+            thick = int(dir.split('_')[1])
         
         param = dict()
         param['thickness'] = -1 * thick
-        param['frames'] = 999
+        param['frames'] = frames - 200
         param['speed'] = speed
         param['fps'] = 200
         
@@ -196,7 +202,7 @@ if __name__ == "__main__":
             extract_images(v_lists, image_paths)
         
         gen_depth_labels(v_lists, image_paths, output, param)
-        gen_stable_labels(v_lists, image_paths, output, param, 'data/stable_20240621.txt')
+        # gen_stable_labels(v_lists, image_paths, output, param, 'data/stable_20240621.txt')
 
 
 

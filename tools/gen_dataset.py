@@ -78,9 +78,9 @@ def filter_khd_info(lines):
         line = line.strip()
         if 'Over_Penetration' in line or 'Normal_Penetration' in line:
             continue
-        elif 'Small_Penetration' in line:
+        # elif 'Small_Penetration' in line:
+        else:
             line = line[7:] # 去掉开头的 'images/'
-
 
             items = line.split(' ')
             path = items[0]
@@ -89,14 +89,14 @@ def filter_khd_info(lines):
 
             items = path.split('/')[0].split('_')
             thick = 2500
-            if len(items) == 2:
-                thick = int(items[-1])
+            if len(items) >= 2:
+                thick = int(items[1])
 
             if depth < thick - 250:
                 result.append(line)
-        else:
-            line = line[7:] # 去掉开头的 'images/'
-            result.append(line)
+        # else:
+        #     line = line[7:] # 去掉开头的 'images/'
+        #     result.append(line)
     
     with open(f"images/khd_filter.txt", 'w') as f:
         for item in result:
@@ -189,16 +189,16 @@ def get_black_lines(root, dir):
 if __name__ == "__main__":
     # 遍历images中所有文件，找到所有KHD.txt 文件
     # 将所有KHD.txt文件行合并
-    black_list = get_black_lines('images', 'black_sample')
+    # black_list = get_black_lines('images', 'black_sample')
     all_khd = get_all_lines('images', 'KHD.txt')
     all_pene = get_all_lines('images', 'penetration.txt')
     all_stable = get_all_lines('images', 'stable.txt')
     black_list = get_black_lines('images', 'black_sample')
-    # split_trainval_count(all_pene + black_list, 'penetration', val_num = 30)
+    split_trainval_count(all_pene + black_list, 'penetration', val_num = 50)
 
     all_khd_filter = filter_khd_info(all_khd)
     split_trainval_ratio(all_khd_filter, 'depth', val_ratio = 0.1)
 
 
-    all_stable_filter = filter_stable_info(all_stable)
-    split_trainval_ratio(all_stable_filter, 'stable', val_ratio = 0.1)
+    # all_stable_filter = filter_stable_info(all_stable)
+    # split_trainval_ratio(all_stable_filter, 'stable', val_ratio = 0.1)

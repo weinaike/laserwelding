@@ -144,7 +144,7 @@ def train(data_loader, model, criterion, optimizer, epoch, display=100,
     data_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
-    top5 = AverageMeter()
+    top2 = AverageMeter()
 
     # set different random see every epoch
     if dist.is_initialized():
@@ -167,18 +167,18 @@ def train(data_loader, model, criterion, optimizer, epoch, display=100,
             loss = criterion(output, target)
 
             # measure accuracy and record loss
-            prec1, prec5 = accuracy(output, target)
+            prec1, prec2 = accuracy(output, target)
 
             if dist.is_initialized():
                 world_size = dist.get_world_size()
                 dist.all_reduce(prec1)
-                dist.all_reduce(prec5)
+                dist.all_reduce(prec2)
                 prec1 /= world_size
-                prec5 /= world_size
+                prec2 /= world_size
 
             losses.update(loss.item(), images.size(0))
             top1.update(prec1[0], images.size(0))
-            top5.update(prec5[0], images.size(0))
+            top2.update(prec2[0], images.size(0))
             # compute gradient and do SGD step
             loss.backward()
 
@@ -197,15 +197,15 @@ def train(data_loader, model, criterion, optimizer, epoch, display=100,
                       'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
                       'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                      'Prec@2 {top2.val:.3f} ({top2.avg:.3f})'.format(
                        epoch, i, len(data_loader), batch_time=batch_time,
-                       data_time=data_time, loss=losses, top1=top1, top5=top5), flush=True)
+                       data_time=data_time, loss=losses, top1=top1, top2=top2), flush=True)
             num_batch += 1
             t_bar.update(1)
             if i > steps_per_epoch:
                 break
 
-    return top1.avg, top5.avg, losses.avg, batch_time.avg, data_time.avg, num_batch
+    return top1.avg, top2.avg, losses.avg, batch_time.avg, data_time.avg, num_batch
 
 
 def validate(data_loader, model, criterion, gpu_id=None):
@@ -213,7 +213,7 @@ def validate(data_loader, model, criterion, gpu_id=None):
     batch_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
-    top5 = AverageMeter()
+    top2 = AverageMeter()
 
     # switch to evaluate mode
     model.eval()
@@ -237,16 +237,16 @@ def validate(data_loader, model, criterion, gpu_id=None):
             all_preds.extend(predicted.cpu().numpy())
             all_labels.extend(target.cpu().numpy())
             # measure accuracy and record loss
-            prec1, prec5 = accuracy(output, target)
+            prec1, prec2 = accuracy(output, target)
             if dist.is_initialized():
                 world_size = dist.get_world_size()
                 dist.all_reduce(prec1)
-                dist.all_reduce(prec5)
+                dist.all_reduce(prec2)
                 prec1 /= world_size
-                prec5 /= world_size
+                prec2 /= world_size
             losses.update(loss.item(), images.size(0))
             top1.update(prec1[0], images.size(0))
-            top5.update(prec5[0], images.size(0))
+            top2.update(prec2[0], images.size(0))
 
             # measure elapsed time
             batch_time.update(time.time() - end)
@@ -257,7 +257,7 @@ def validate(data_loader, model, criterion, gpu_id=None):
     # 输出三分类测试混淆矩阵
     print('Confusion Matrix:')
     print(cm)
-    return top1.avg, top5.avg, losses.avg, batch_time.avg, cm
+    return top1.avg, top2.avg, losses.avg, batch_time.avg, cm
 
 
 
@@ -280,7 +280,7 @@ def train_regression(data_loader, model, criterion, optimizer, epoch, display=10
     end = time.time()
     num_batch = 0
 
-    norm = -3000.0
+    norm = -10000.0
 
     with tqdm(total=len(data_loader)) as t_bar:
         for i, (images, target) in enumerate(data_loader):
@@ -357,7 +357,7 @@ def validate_regression(data_loader, model, criterion, gpu_id=None):
 
     all_preds = []
     all_labels = []    
-    norm = -3000.0      
+    norm = -10000.0 
 
     with torch.no_grad(), tqdm(total=len(data_loader)) as t_bar:
         end = time.time()
@@ -367,7 +367,6 @@ def validate_regression(data_loader, model, criterion, gpu_id=None):
             # save = images.cpu().numpy()
             # save = save[-1]
             # np.save('save_train.npy', save)
-
 
             if gpu_id is not None:
                 images = images.cuda(gpu_id, non_blocking=True)
@@ -418,6 +417,6 @@ def validate_regression(data_loader, model, criterion, gpu_id=None):
     cm = [np.max(diff) , np.min(diff) ] 
 
     # 输出三分类测试混淆矩阵
-    print('max an min:')
+    print('max and min:')
     print(cm)
     return top1.avg, top5.avg, losses.avg, batch_time.avg, cm
