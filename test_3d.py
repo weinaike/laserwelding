@@ -204,9 +204,9 @@ def main():
                 predictions = np.argsort(output, axis=1)
                 if args.type == 'regression':
                     # print("{},{},{}".format(str(label.numpy()), str(output),  str(output * -3000.0), file=logfile))
-                    all_preds.extend(output[0] * -3000.0)
+                    all_preds.extend(output[0] * args.norm)
                     all_labels.append(label.numpy())
-                    print("{},{}".format(str(label.numpy()[0]), output[0][0] * -3000.0), file=logfile)
+                    print("{},{}".format(str(label.numpy()[0]), output[0][0] * args.norm), file=logfile)
                 else:
                     for ii in range(len(predictions)):
                         # preds = [id_to_label[str(pred)] for pred in predictions[ii][::-1][:5]]

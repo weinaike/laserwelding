@@ -139,7 +139,7 @@ def build_dataflow(dataset, is_train, batch_size, workers=36, is_distributed=Fal
 
 
 def train(data_loader, model, criterion, optimizer, epoch, display=100,
-          steps_per_epoch=99999999999, clip_gradient=None, gpu_id=None, rank=0):
+          steps_per_epoch=99999999999, clip_gradient=None, gpu_id=None, rank=0, norm = 0):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -208,7 +208,7 @@ def train(data_loader, model, criterion, optimizer, epoch, display=100,
     return top1.avg, top2.avg, losses.avg, batch_time.avg, data_time.avg, num_batch
 
 
-def validate(data_loader, model, criterion, gpu_id=None):
+def validate(data_loader, model, criterion, gpu_id=None, norm = 0):
     print('validate')
     batch_time = AverageMeter()
     losses = AverageMeter()
@@ -264,7 +264,7 @@ def validate(data_loader, model, criterion, gpu_id=None):
 
 
 def train_regression(data_loader, model, criterion, optimizer, epoch, display=100,
-          steps_per_epoch=99999999999, clip_gradient=None, gpu_id=None, rank=0):
+          steps_per_epoch=99999999999, clip_gradient=None, gpu_id=None, rank=0, norm = -10000.0):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -279,8 +279,6 @@ def train_regression(data_loader, model, criterion, optimizer, epoch, display=10
     model.train()
     end = time.time()
     num_batch = 0
-
-    norm = -10000.0
 
     with tqdm(total=len(data_loader)) as t_bar:
         for i, (images, target) in enumerate(data_loader):
@@ -345,7 +343,7 @@ def train_regression(data_loader, model, criterion, optimizer, epoch, display=10
     return top1.avg, top5.avg, losses.avg, batch_time.avg, data_time.avg, num_batch
 
 
-def validate_regression(data_loader, model, criterion, gpu_id=None):
+def validate_regression(data_loader, model, criterion, gpu_id=None, norm = -10000.0):
     print('validate_regression')
     batch_time = AverageMeter()
     losses = AverageMeter()
@@ -357,7 +355,6 @@ def validate_regression(data_loader, model, criterion, gpu_id=None):
 
     all_preds = []
     all_labels = []    
-    norm = -10000.0 
 
     with torch.no_grad(), tqdm(total=len(data_loader)) as t_bar:
         end = time.time()
@@ -414,9 +411,8 @@ def validate_regression(data_loader, model, criterion, gpu_id=None):
     
     
     diff = np.abs((np.array(all_labels) - np.array(all_preds)) * norm)
-    cm = [np.max(diff) , np.min(diff) ] 
-
-    # 输出三分类测试混淆矩阵
-    print('max and min:')
+    cm = [np.max(diff) , np.min(diff), np.sum(diff < 1000), len(all_labels)] 
+    # 距离统计
+    print('max , min,  right, total:')
     print(cm)
     return top1.avg, top5.avg, losses.avg, batch_time.avg, cm

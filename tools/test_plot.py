@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 
 def plot_video_info():
     # 遍历‘data/test_2500’中的文件， 找到*.raw文件， 输出该文件所在完整路径
-    v_path = os.path.join('data', 'test_2500')
+    # v_path = os.path.join('data', 'test_2500')
+    v_path = os.path.join('data', 'test_20240722')
     
     videos = []
     # 遍历images目录中的所有文件
@@ -45,7 +46,7 @@ def plot_video_info():
                 df = pd.read_csv(csv_file, usecols=[0, 1])
                 # print(df.head())
                 # 截取第一列数据，数值范围在1000-8300之间的数据
-                df = df[(df['Keyhole Depth X (um)'] >= 500) & (df['Keyhole Depth X (um)'] <= 90000)]
+                df = df[(df['Keyhole Depth X (um)'] >= 500) & (df['Keyhole Depth X (um)'] <= 990000)]
                 #读取该文件的所有行
                 x = df['Keyhole Depth X (um)']
                 y = df['Keyhole Depth Z (um)']
@@ -74,7 +75,7 @@ def plot_video_info():
 
 
 def plot_depth_info():
-    csv_file = os.path.join('snapshots', 'laser_welding_depth-gray-TAM-b3-sum-resnet-18-f8', 'test_1crops_1clips_224.csv')
+    csv_file = os.path.join('snapshots', 'laser_welding_depth-gray-TAM-b3-sum-resnet-50-f8', 'test_1crops_1clips_224.csv')
     result = []
     with open(csv_file) as f:
         predicts = f.readlines()
@@ -183,8 +184,8 @@ def plot_stable_info():
         plot_stable(x, fws, tre, tle, lx, predicts, f'{dir}.txt', status=status)
 
 if __name__ == '__main__':
-    # plot_video_info()
+    plot_video_info()
     # plot_depth_info()
-    plot_stable_info()
+    # plot_stable_info()
 
 

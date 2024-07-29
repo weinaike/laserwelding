@@ -184,7 +184,7 @@ def test_depth(videos, model, args):
                 imgs = imgs.cuda()
                 output = eval_a_batch(imgs, model, args.num_clips, args.num_crops, args.threed_data)
 
-                predicted = output.cpu().numpy()[0][0] * -3000.0
+                predicted = output.cpu().numpy()[0][0] * args.norm
                 print(video, predicted)
                 
                 image_stack.clear()
@@ -260,7 +260,7 @@ def test_both(videos, model_cls, model_depth, args):
 
                 if predicted == 0:
                     output = eval_a_batch(imgs, model_depth, args.num_clips, args.num_crops, args.threed_data)
-                    depth = output.cpu().numpy()[0][0] * -3000.0
+                    depth = output.cpu().numpy()[0][0] * args.norm
                 else:
                     depth = 0
                 print(video, predicted, depth)
@@ -295,7 +295,8 @@ if __name__ == '__main__':
     videos = []
 
     # 遍历‘data/test_2500’中的文件， 找到*.raw文件， 输出该文件所在完整路径
-    v_path = os.path.join('data', 'test_2500')
+    # v_path = os.path.join('data', 'test_2500')
+    v_path = os.path.join('data', 'test_20240722')
     if args.type == 'stable':
         v_path = os.path.join('data', 'stable_20240621.txt')
         
@@ -328,9 +329,11 @@ if __name__ == '__main__':
         model = create_model(args, 1)
         test_depth(videos, model, args)
     elif args.type == 'both':
-        args.pretrained = 'snapshots/laser_welding-gray-TAM-b3-sum-resnet-18-f8-multisteps-bs16-e50_20240610_161355/checkpoint.pth.tar'
+        args.pretrained = 'snapshots/laser_welding-gray-TAM-b3-sum-resnet-34-f8-multisteps-bs16-e50_20240724_093147/checkpoint.pth.tar'
+        args.depth = 34
         model_cls = create_model(args, 4)
-        args.pretrained = 'snapshots/laser_welding_depth-gray-TAM-b3-sum-resnet-18-f8-multisteps-bs16-e50_20240610_161701/checkpoint.pth.tar'
+        args.pretrained = 'snapshots/laser_welding_depth-gray-TAM-b3-sum-resnet-50-f8-multisteps-bs16-e120_20240725_085257/checkpoint.pth.tar'
+        args.depth = 50
         model_depth = create_model(args, 1)
         test_both(videos, model_cls, model_depth, args)
 

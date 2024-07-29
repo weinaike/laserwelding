@@ -128,4 +128,6 @@ def arg_parser():
                         help='[v1] TSN data argmentation, [v2] resize the shorter side to `scale_range`')
     parser.add_argument('--type', default='class', type=str, choices=['class', 'regression', 'both', 'stable'],
                         help='[only ro test for video] class for classification, regression for regression, all for both')    
+    parser.add_argument('--norm', default=-10000, type=int, 
+                        help='norm for depth labels, default is -10000')    
     return parser

@@ -310,13 +310,13 @@ def main_worker(gpu, ngpus_per_node, args):
         train_top1, train_top5, train_losses, train_speed, speed_data_loader, train_steps = \
             train(train_loader, model, train_criterion, optimizer, epoch + 1,
                   display=args.print_freq, clip_gradient=args.clip_gradient,
-                  gpu_id=args.gpu, rank=args.rank)
+                  gpu_id=args.gpu, rank=args.rank, norm = args.norm)
         if args.distributed:
             dist.barrier()
 
         # evaluate on validation set
         val_top1, val_top5, val_losses, val_speed, cm = validate(val_loader, model, val_criterion,
-                                                             gpu_id=args.gpu)
+                                                             gpu_id=args.gpu, norm = args.norm)
 
         print(cm, flush=True,file=logfile)
         # update current learning rate
