@@ -36,6 +36,8 @@ def arg_parser():
     parser.add_argument('--gpu', help='comma separated list of GPU(s) to use.')
     parser.add_argument('--disable_cudnn_benchmark', dest='cudnn_benchmark', action='store_false',
                         help='Disable cudnn to search the best mode (avoid OOM)')
+    parser.add_argument('--opti', default='sgd', type=str, choices=['sgd', 'adam'],
+                        help='optimizer')       
     parser.add_argument('-b', '--batch-size', default=256, type=int,
                         metavar='N', help='mini-batch size (default: 256)')
     parser.add_argument('--lr', '--learning-rate', default=0.01, type=float,
@@ -124,9 +126,9 @@ def arg_parser():
                              'fastest way to use PyTorch for either single node or '
                              'multi node data parallel training')
     parser.add_argument('--debug', action='store_true', help='debug info')
-    parser.add_argument('--criterion', default='softmax', type=str, choices=['softmax', 'L1', 'MSE'],
+    parser.add_argument('--criterion', default='softmax', type=str, choices=['softmax', 'L1', 'MSE', 'MIX'],
                         help='[v1] TSN data argmentation, [v2] resize the shorter side to `scale_range`')
-    parser.add_argument('--type', default='class', type=str, choices=['class', 'regression', 'both', 'stable'],
+    parser.add_argument('--type', default='class', type=str, choices=['class', 'regression', 'both', 'stable', 'mix'],
                         help='[only ro test for video] class for classification, regression for regression, all for both')    
     parser.add_argument('--norm', default=-10000, type=int, 
                         help='norm for depth labels, default is -10000')    

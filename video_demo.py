@@ -104,6 +104,9 @@ def test_cls(videos, model, args):
                 break
             img = Image.frombytes('L', (640, 512), bytes)
             i += 1
+
+            if len(image_stack) == args.groups:
+                image_stack = image_stack[1:]        
             if i % args.frames_per_group == 0:
                 image_stack.append(img)
 
@@ -121,7 +124,7 @@ def test_cls(videos, model, args):
                 predicted = predicted.cpu().numpy()[0]
                 print(video, i, predicted)
                 
-                image_stack.clear()
+                # image_stack.clear()
 
             f_res.write("{} {}\n".format(i, predicted))
             # Convert PIL Image to OpenCV format
@@ -173,6 +176,8 @@ def test_depth(videos, model, args):
                 break
             img = Image.frombytes('L', (640, 512), bytes)
             i += 1
+            if len(image_stack) == args.groups:
+                image_stack = image_stack[1:]
             if i % args.frames_per_group == 0:
                 image_stack.append(img)
 
@@ -187,7 +192,7 @@ def test_depth(videos, model, args):
                 predicted = output.cpu().numpy()[0][0] * args.norm
                 print(video, predicted)
                 
-                image_stack.clear()
+                # image_stack.clear()
             
             f_res.write("{} {}\n".format(i, predicted))
 
@@ -229,6 +234,8 @@ def test_both(videos, model_cls, model_depth, args):
                                 version=args.augmentor_ver)
     label ={ 0: 'Incompelement_Penetration', 1: 'Normal_Penetration', 2: 'Over_Penetration', 3: 'black', -1 : 'unkown'}
     for video in videos:
+        label_cls = video.split('/')[-3]
+        thickness = video.split('/')[-2].split('_')[1]
         f =  open(video, 'rb') 
 
         f_res = open(os.path.join('result', os.path.basename(video.replace('.raw', '_both.txt'))), 'w')
@@ -244,6 +251,8 @@ def test_both(videos, model_cls, model_depth, args):
                 break
             img = Image.frombytes('L', (640, 512), bytes)
             i += 1
+            if len(image_stack) == args.groups:
+                image_stack = image_stack[1:]
             if i % args.frames_per_group == 0:
                 image_stack.append(img)
 
@@ -260,12 +269,116 @@ def test_both(videos, model_cls, model_depth, args):
 
                 if predicted == 0:
                     output = eval_a_batch(imgs, model_depth, args.num_clips, args.num_crops, args.threed_data)
-                    depth = output.cpu().numpy()[0][0] * args.norm
+                    depth = int(output.cpu().numpy()[0][0] * args.norm)
                 else:
                     depth = 0
                 print(video, predicted, depth)
                 
-                image_stack.clear()
+            
+            f_res.write("{} {} {}\n".format(i, predicted, depth))
+
+
+            # Convert PIL Image to OpenCV format
+            img_cv = np.array(img)
+
+            # Write predicted label on the image
+            cv2.putText(img_cv, f'Sample Thick : {thickness}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200), 2, cv2.LINE_AA)
+            cv2.putText(img_cv, f'Label Class   : {label_cls}', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200), 2, cv2.LINE_AA)
+            cv2.putText(img_cv, f'Predict Class : {label[predicted]}', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255), 2, cv2.LINE_AA)
+            if depth == 0:
+                depth_str = '/'
+            else:
+                depth_str = str(abs(depth))
+            cv2.putText(img_cv, f'Predict Depth : {depth_str}', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255), 2, cv2.LINE_AA)
+            # cv2.imwrite('images/output.png', img_cv)          
+            img_np = np.array(img_cv)
+
+            # Write the numpy array to a .raw file
+            with open(output_name, 'ab') as raw_file:
+                img_np.tofile(raw_file)        
+        cmd = f"ffmpeg -y -s 640x512 -pix_fmt gray -r 30 -i {output_name} -c:v libx264 \
+                -pix_fmt yuv420p {output_name.replace('yuv', 'mp4')}; rm {output_name}"
+        os.system(cmd)
+        f.close()
+        f_res.close()
+
+
+def test_mix(videos, model, args):
+    
+    model = model.cuda()
+    model.eval()
+
+
+    mean = model.mean(args.modality)
+    std = model.std(args.modality)
+    augmentor = get_augmentor(False, args.input_size, scale_range=args.scale_range, mean=mean,
+                                std=std, disable_scaleup=args.disable_scaleup,
+                                threed_data=args.threed_data,
+                                is_flow=True if args.modality == 'flow' else False,
+                                version=args.augmentor_ver)
+    label ={ 0: 'Incompelement_Penetration', 1: 'Normal_Penetration', 2: 'Over_Penetration', 3: 'black', -1 : 'unkown'}
+    for video in videos:
+        f =  open(video, 'rb') 
+
+        f_res = open(os.path.join('result', os.path.basename(video.replace('.raw', '_both.txt'))), 'w')
+        output_name = os.path.join('result', os.path.basename(video.replace('.raw', '_both.yuv')))
+
+        image_stack = []
+        i = 0
+        predicted = 0
+        depth = 0
+        while True:
+            bytes = f.read(640*512)
+            if not bytes:
+                break
+            img = Image.frombytes('L', (640, 512), bytes)
+            i += 1
+            if len(image_stack) == args.groups:
+                image_stack = image_stack[1:]
+            if i % args.frames_per_group == 0:
+                image_stack.append(img)
+
+            if len(image_stack) == args.groups:
+
+                imgs = augmentor(image_stack)
+                imgs.unsqueeze_(0)
+
+                imgs = imgs.cuda()
+
+                with torch.no_grad():
+                    batch_size = imgs.shape[0]
+                    if args.threed_data:
+                        tmp = torch.chunk(imgs, args.num_crops * args.num_clips, dim=2)
+                        imgs = torch.cat(tmp, dim=0)
+                    else:
+                        imgs = imgs.view((batch_size * args.num_crops * args.num_clips, -1) + imgs.size()[2:])
+                    out1, out2, out3 = model(imgs)
+
+                    if args.threed_data:
+                        tmp = torch.chunk(result, args.num_crops * args.num_clips, dim=0)
+                        result = None
+                        for i in range(len(tmp)):
+                            result = result + tmp[i] if result is not None else tmp[i]
+                        out1 /= (args.num_crops * args.num_clips)
+                        out2 /= (args.num_crops * args.num_clips)
+                        out3 /= (args.num_crops * args.num_clips)
+                    else:
+                        out1 = out1.reshape(batch_size, args.num_crops * args.num_clips, -1).mean(dim=1)
+                        out2 = out2.reshape(batch_size, args.num_crops * args.num_clips, -1).mean(dim=1)
+                        out3 = out3.reshape(batch_size, args.num_crops * args.num_clips, -1).mean(dim=1)
+
+                # out1, out2, out3 = eval_a_batch(imgs, model, args.num_clips, args.num_crops, args.threed_data)
+                _, predicted = torch.max(out1.data, 1)
+
+                predicted = predicted.cpu().numpy()[0]
+
+                if predicted == 0:
+                    depth = out2.cpu().numpy()[0][0] * args.norm
+                else:
+                    depth = 0
+                print(video, predicted, depth)
+                
+                # image_stack.clear()
             
             f_res.write("{} {} {}\n".format(i, predicted, depth))
 
@@ -286,6 +399,8 @@ def test_both(videos, model_cls, model_depth, args):
         os.system(cmd)
         f.close()
         f_res.close()
+
+
 
 if __name__ == '__main__':
 
@@ -329,13 +444,16 @@ if __name__ == '__main__':
         model = create_model(args, 1)
         test_depth(videos, model, args)
     elif args.type == 'both':
-        args.pretrained = 'snapshots/laser_welding-gray-TAM-b3-sum-resnet-34-f8-multisteps-bs16-e50_20240724_093147/checkpoint.pth.tar'
-        args.depth = 34
+        args.pretrained = 'snapshots/laser_welding-gray-TAM-b3-sum-resnet-18-f8-multisteps-bs16-e120_20240805_163936/checkpoint.pth.tar'
+        args.depth = 18
         model_cls = create_model(args, 4)
-        args.pretrained = 'snapshots/laser_welding_depth-gray-TAM-b3-sum-resnet-50-f8-multisteps-bs16-e120_20240725_085257/checkpoint.pth.tar'
+        args.pretrained = 'snapshots/laser_welding_depth-gray-TAM-b3-sum-resnet-50-f8-multisteps-bs16-e150_20240806_213424/checkpoint.pth.tar'
         args.depth = 50
         model_depth = create_model(args, 1)
         test_both(videos, model_cls, model_depth, args)
+    elif args.type == 'mix':
+        model = create_model(args, 8)
+        test_mix(videos, model, args)        
 
     else:# for stable
         model = create_model(args, 2)

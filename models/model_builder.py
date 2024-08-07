@@ -1,4 +1,4 @@
-from . import s3d, i3d, s3d_resnet, i3d_resnet, resnet, inception_v1, torch_s3d
+from . import s3d, i3d, s3d_resnet, i3d_resnet, resnet, inception_v1, torch_s3d, resnet_multihead
 
 from torchvision.models.video.s3d import S3D_Weights
 
@@ -9,7 +9,8 @@ MODEL_TABLE = {
     'i3d_resnet': i3d_resnet,
     'resnet': resnet,
     'inception_v1': inception_v1,
-    'torch_s3d': torch_s3d
+    'torch_s3d': torch_s3d,
+    'resnet_multihead': resnet_multihead
 }
 
 

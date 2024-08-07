@@ -80,6 +80,15 @@ DATASET_CONFIG = {
         'image_tmpl': '{:05d}.png',
         'filter_video': 0
     },
+    'laser_welding_all': {
+        'num_classes': 8,
+        'train_list_name': 'train_mix.txt',
+        'val_list_name': 'val_mix.txt',
+        'test_list_name': 'test_mix.txt',
+        'filename_seperator': " ",
+        'image_tmpl': '{:05d}.png',
+        'filter_video': 0
+    },    
 }
 
 

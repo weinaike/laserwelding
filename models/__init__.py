@@ -5,6 +5,7 @@ from models.threed_models.i3d import i3d
 from models.threed_models.i3d_resnet import i3d_resnet
 
 from models.twod_models.resnet import resnet
+from models.twod_models.resnet_multihead import resnet_multihead
 from models.twod_models.inception_v1 import inception_v1
 
 from torchvision.models.video.s3d import s3d as torch_s3d

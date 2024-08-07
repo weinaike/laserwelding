@@ -2,6 +2,7 @@ import os
 from PIL import Image, ImageStat
 import numpy as np
 import argparse
+import concurrent.futures
 
 def calc_image_light_mean(image_path):
     img = Image.open(image_path)
@@ -16,10 +17,21 @@ def calc_image_light_max(image_path):
 
     # 灰度图像最亮的100个点的平均值
     img_data = np.array(img).flatten()
-    brightest_points = np.partition(-img_data, 100)[:100]
-    mean_of_brightest = np.mean(brightest_points)
+    top_100_data = np.sort(img_data)[-100:]
+    mean_of_brightest = np.mean(top_100_data)
     
     return mean_of_brightest
+
+
+def get_image_max(image_path):
+    img = Image.open(image_path)
+    img = img.convert('L')
+
+    # 获取灰度图像最亮的100个点的平均值
+    img_data = np.array(img).flatten()
+    top_100_data = np.sort(img_data)[-100:]
+
+    return np.max(img_data) , np.min(img_data), int(np.mean(top_100_data)), int(np.mean(top_100_data[:-10]))
 
 
 
@@ -110,24 +122,47 @@ def light_analysis(file):
 if __name__ == "__main__":
 
     # 需要解析图片， 则加上 --image 参数
-    # 需要生成训练和验证文件，则加上 --trainval 参数
-    argparse = argparse.ArgumentParser()
-    argparse.add_argument('--numpy', action='store_true', default=False, help='extract images from video files')
-    args = argparse.parse_args()    
+    # # 需要生成训练和验证文件，则加上 --trainval 参数
+    # argparse = argparse.ArgumentParser()
+    # argparse.add_argument('--numpy', action='store_true', default=False, help='extract images from video files')
+    # args = argparse.parse_args()    
 
-    if args.numpy:    
-        file = os.path.join('images', 'khd_filter.txt')
-        lines = []
-        with open(file, 'r') as f:
-            lines = f.readlines()
+    # if args.numpy:    
+    #     file = os.path.join('images', 'khd_filter.txt')
+    #     lines = []
+    #     with open(file, 'r') as f:
+    #         lines = f.readlines()
         
-        light_info = get_light_info(lines)
-        print(light_info.shape)
-        np.save('images/light_info.npy', light_info)
+    #     light_info = get_light_info(lines)
+    #     print(light_info.shape)
+    #     np.save('images/light_info.npy', light_info)
        
-    light_analysis('images/light_info.npy')
+    # light_analysis('images/light_info.npy')
+    # # # 遍历images路径下所有文件夹中名00500.png的图片
+    # for root, dirs, files in os.walk('images'):
+    #     for file in sorted(files):
+    #         if file.endswith('.png'):
+    #             max_min_mean_mean= get_image_max(os.path.join(root, file))
+    #             if max_min_mean_mean[3] < 15:
+    #                 print(root, file, max_min_mean_mean)
+    def print_max_mean(line):
+        items = line.split(' ')
+        path = items[0]
+        start = int(items[1])
+        end = int(items[2])
+        label = int(items[3])
+        for i in range(start, end):
+            if 'black_sample' in path:
+                continue            
+            image_file = os.path.join('images', path , f'{i:05d}.png')
+            max_min_mean_mean= get_image_max(image_file)
+            if max_min_mean_mean[3] < 15:
+                print(line.strip(), max_min_mean_mean)
 
 
-
-
-
+    file = 'images/train_mix.txt'
+    lines = []
+    with open(file, 'r') as f:
+        lines = f.readlines()
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        executor.map(print_max_mean, lines)

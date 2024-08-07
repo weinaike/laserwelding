@@ -80,23 +80,20 @@ def filter_khd_info(lines):
             continue
         # elif 'Small_Penetration' in line:
         else:
-            line = line[7:] # 去掉开头的 'images/'
+            # line = line[7:] # 去掉开头的 'images/'
 
             items = line.split(' ')
             path = items[0]
             depth =  -1 * int(items[-1])
 
 
-            items = path.split('/')[0].split('_')
+            items = path.split('/')[1].split('_')
             thick = 2500
             if len(items) >= 2:
-                thick = int(items[1])
+                thick = int(items[1]) # 从文件夹名获取厚度
 
             if depth < thick - 250:
                 result.append(line)
-        # else:
-        #     line = line[7:] # 去掉开头的 'images/'
-        #     result.append(line)
     
     with open(f"images/khd_filter.txt", 'w') as f:
         for item in result:
@@ -140,11 +137,12 @@ def split_trainval_ratio(lines, ext, val_ratio = 0.1):
         line = line.strip()
         items = line.split(' ')
         start = int(items[1])
-        path = os.path.join('images', items[0], f'{start:05d}.png')
+        path = os.path.join(items[0], f'{start:05d}.png')
+        
         if os.path.exists(path):
             new_lines.append(line)
         else:
-            print(f"remove {line}")
+            print(f"remove {line},  {path} not exist")
     print(f"valid {len(new_lines)} lines", f" in Total {len(lines)} lines")
     # lines 随机打乱， 前80%作为训练集， 后20%作为验证集
     
@@ -158,14 +156,14 @@ def split_trainval_ratio(lines, ext, val_ratio = 0.1):
     val.sort()
     with open(f"images/train_{ext}.txt", 'w') as f:
         for item in train:
-            f.write("%s\n" % item)
+            f.write("%s\n" % item[7:])
 
     with open(f"images/val_{ext}.txt", 'w') as f:
         for item in val:
-            f.write("%s\n" % item)
+            f.write("%s\n" % item[7:])
 
 
-def get_black_lines(root, dir):
+def get_black_lines(root, dir, single = True):
     path = os.path.join(root, dir)
     samples = os.listdir(path)
 
@@ -183,7 +181,11 @@ def get_black_lines(root, dir):
             continue
 
         for i in range(start, end - step, step//4):
-            black_list.append(f"{img_dir} {i} {i + step} {3}")
+            if single:
+                black_list.append(f"{img_dir} {i} {i + step} {3}")
+            else:
+                black_list.append(f"{img_dir} {i} {i + step} {3} {-1} {-1}")
+                
     return black_list
         
 if __name__ == "__main__":
@@ -193,8 +195,14 @@ if __name__ == "__main__":
     all_khd = get_all_lines('images', 'KHD.txt')
     all_pene = get_all_lines('images', 'penetration.txt')
     all_stable = get_all_lines('images', 'stable.txt')
+    all_mix = get_all_lines('images', 'mix.txt')
     black_list = get_black_lines('images', 'black_sample')
-    split_trainval_count(all_pene + black_list, 'penetration', val_num = 50)
+    
+    black_list_3label = get_black_lines('images', 'black_sample', False)
+    split_trainval_ratio(all_mix + black_list_3label, 'mix', val_ratio = 0.1)
+
+
+    # split_trainval_count(all_pene + black_list, 'penetration', val_num = 50)
 
     all_khd_filter = filter_khd_info(all_khd)
     split_trainval_ratio(all_khd_filter, 'depth', val_ratio = 0.1)

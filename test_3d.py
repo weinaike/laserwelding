@@ -219,17 +219,17 @@ def main():
             t_bar.update(1)
 
         outputs = outputs[:total_outputs]
-        print("Predict {} videos.".format(total_outputs), flush=True)
+        print("Predict {} videos. avg time {:.4f}".format(total_outputs, batch_time.avg), flush=True)
         np.save(os.path.join(log_folder, '{}_{}crops_{}clips_{}_details.npy'.format(
             "val" if args.evaluate else "test", args.num_crops,
             args.num_clips, args.input_size)), outputs)
 
     if args.evaluate:
-        print('Val@{}({}) (# crops = {}, # clips = {}): \tTop@1: {:.4f}\tTop@2: {:.4f}'.format(
-            args.input_size, scale_size, args.num_crops, args.num_clips, top1.avg, top5.avg),
+        print('Val@{}({}) (# crops = {}, # clips = {}): \tTop@1: {:.4f}\tTop@2: {:.4f}\tavg time:{:.4f}'.format(
+            args.input_size, scale_size, args.num_crops, args.num_clips, top1.avg, top5.avg, batch_time.avg),
             flush=True)
-        print('Val@{}({}) (# crops = {}, # clips = {}): \tTop@1: {:.4f}\tTop@2: {:.4f}'.format(
-            args.input_size, scale_size, args.num_crops, args.num_clips, top1.avg, top5.avg),
+        print('Val@{}({}) (# crops = {}, # clips = {}): \tTop@1: {:.4f}\tTop@2: {:.4f}\tavg time:{:.4f}'.format(
+            args.input_size, scale_size, args.num_crops, args.num_clips, top1.avg, top5.avg, batch_time.avg),
             flush=True, file=logfile)
         
         cm = confusion_matrix(all_labels, all_preds)

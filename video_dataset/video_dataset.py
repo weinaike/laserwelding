@@ -330,12 +330,20 @@ class VideoDataSet(data.Dataset):
         # else:
         #     label = int(record.label)
         
-        label = int(record.label)
         # re-order data to targeted format.
         h, w = images.size()[-2:]
         images = images.view(-1,h,w )
+
+        if isinstance(record.label, list):  
+            label = np.array(record.label)
+            return images, label
+        else:
+            label = int(record.label)
+            return images, label
+
+
         
-        return images, label
+        
 
     def __len__(self):
         return len(self.video_list)

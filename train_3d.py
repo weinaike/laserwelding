@@ -170,15 +170,21 @@ def main_worker(gpu, ngpus_per_node, args):
     elif args.criterion == 'MSE':
         train_criterion = nn.MSELoss().cuda(args.gpu)
         val_criterion = nn.MSELoss().cuda(args.gpu)
+    elif args.criterion == 'MIX':
+        train_criterion = [nn.CrossEntropyLoss().cuda(args.gpu), nn.L1Loss().cuda(args.gpu)]
+        val_criterion = [nn.CrossEntropyLoss().cuda(args.gpu), nn.L1Loss().cuda(args.gpu)]
     else:
         raise ValueError("Criterion not supported: {}".format(args.criterion))
 
     if args.criterion == 'softmax':
         from utils.utils import train as train
         from utils.utils import validate as validate
-    else:
+    elif args.criterion == 'L1' or args.criterion == 'MSE':
         from utils.utils import train_regression as train
         from utils.utils import validate_regression as validate
+    elif args.criterion == 'MIX':
+        from utils.utils import train_mix as train
+        from utils.utils import validate_mix as validate
 
     # Data loading code
     val_list = os.path.join(args.datadir, val_list_name)
@@ -242,10 +248,14 @@ def main_worker(gpu, ngpus_per_node, args):
                                   workers=args.workers, is_distributed=args.distributed)
 
     sgd_polices = model.parameters()
-    optimizer = torch.optim.SGD(sgd_polices, args.lr,
-                                momentum=args.momentum,
-                                weight_decay=args.weight_decay,
-                                nesterov=args.nesterov)
+    if args.opti == 'sgd':
+        optimizer = torch.optim.SGD(sgd_polices, args.lr,
+                                    momentum=args.momentum,
+                                    weight_decay=args.weight_decay,
+                                    nesterov=args.nesterov)
+    elif args.opti == 'adam':
+        optimizer = torch.optim.Adam(sgd_polices, args.lr, weight_decay=args.weight_decay)
+
 
     if args.lr_scheduler == 'step':
         scheduler = lr_scheduler.StepLR(optimizer, args.lr_steps[0], gamma=0.1)
