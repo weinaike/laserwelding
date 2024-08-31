@@ -20,5 +20,4 @@
 * video_demo_both.sh
   注意，该脚本涉及两个模型，因而pretrained设置是无效的，需要video_demo.py内部修改模型地址
 
-
 具体数据分析工具， 详见tools/readme.md

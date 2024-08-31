@@ -1,24 +1,13 @@
 import os
-import time
-
-import torch.nn as nn
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
-import torchvision.transforms as transforms
-from tqdm import tqdm
-from sklearn.metrics import confusion_matrix
 from models import build_model
-from utils.utils import build_dataflow, AverageMeter, accuracy, get_augmentor
+from utils.utils import get_augmentor
 from utils.video_transforms import *
-from video_dataset.video_dataset import VideoDataSet
-from video_dataset.dataset_config import get_dataset_config
 from opts import arg_parser
-
-import matplotlib.pyplot as plt
-import torchvision
 import cv2
 
 def eval_a_batch(data, model, num_clips=1, num_crops=1, threed_data=False):
@@ -215,7 +204,78 @@ def test_depth(videos, model, args):
         f_res.close()
 
 
-def test_both(videos, model_cls, model_depth, args):
+def test_stable(videos, model, args):
+
+    
+    model = model.cuda()
+    model.eval()
+
+    mean = model.mean(args.modality)
+    std = model.std(args.modality)
+    augmentor = get_augmentor(False, args.input_size, scale_range=args.scale_range, mean=mean,
+                                std=std, disable_scaleup=args.disable_scaleup,
+                                threed_data=args.threed_data,
+                                is_flow=True if args.modality == 'flow' else False,
+                                version=args.augmentor_ver)
+
+
+    for video in videos:
+        f =  open(video, 'rb') 
+
+        f_res = open(os.path.join('result', os.path.basename(video.replace('.raw', '_stable.txt'))), 'w')
+        output_name = os.path.join('result', os.path.basename(video.replace('.raw', '_stable.yuv')))
+
+        image_stack = []
+        i = 0
+        predicted_front = 0
+        predicted_back = 0
+        while True:
+            bytes = f.read(640*512)
+            if not bytes:
+                break
+            img = Image.frombytes('L', (640, 512), bytes)
+            i += 1
+            if len(image_stack) == args.groups:
+                image_stack = image_stack[1:]
+            if i % args.frames_per_group == 0:
+                image_stack.append(img)
+
+            if len(image_stack) == args.groups:
+
+                imgs = augmentor(image_stack)
+                imgs.unsqueeze_(0)
+
+                imgs = imgs.cuda()
+                output = eval_a_batch(imgs, model, args.num_clips, args.num_crops, args.threed_data)
+
+                predicted_front = int(output.cpu().numpy()[0][0] * args.norm)
+                predicted_back = int(output.cpu().numpy()[0][1] * args.norm)
+                print(video, predicted_front, predicted_back)
+                
+                # image_stack.clear()
+            
+            f_res.write("{} {} {}\n".format(i, predicted_front, predicted_back))
+
+
+            # Convert PIL Image to OpenCV format
+            img_cv = np.array(img)
+
+            # Write predicted label on the image
+            cv2.putText(img_cv, f'{predicted_front} {predicted_back}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255), 2, cv2.LINE_AA)
+            # cv2.imwrite('images/output.png', img_cv)          
+            img_np = np.array(img_cv)
+
+            # Write the numpy array to a .raw file
+            with open(output_name, 'ab') as raw_file:
+                img_np.tofile(raw_file)        
+        cmd = f"ffmpeg -y -s 640x512 -pix_fmt gray -r 30 -i {output_name} -c:v libx264 \
+                -pix_fmt yuv420p {output_name.replace('yuv', 'mp4')}; rm {output_name}"
+        os.system(cmd)
+        f.close()
+        f_res.close()
+
+
+def test_both(videos, model_cls, model_depth,  args, model_stable= None):
     
     model_cls = model_cls.cuda()
     model_cls.eval()
@@ -223,6 +283,10 @@ def test_both(videos, model_cls, model_depth, args):
 
     model_depth = model_depth.cuda()
     model_depth.eval()
+
+    if model_stable is not None:
+        model_stable = model_stable.cuda()
+        model_stable.eval()
 
 
     mean = model_cls.mean(args.modality)
@@ -245,6 +309,8 @@ def test_both(videos, model_cls, model_depth, args):
         i = 0
         predicted = 0
         depth = 0
+        front_pred = 0
+        back_pred = 0
         while True:
             bytes = f.read(640*512)
             if not bytes:
@@ -267,15 +333,18 @@ def test_both(videos, model_cls, model_depth, args):
 
                 predicted = predicted.cpu().numpy()[0]
 
-                if predicted == 0:
-                    output = eval_a_batch(imgs, model_depth, args.num_clips, args.num_crops, args.threed_data)
-                    depth = int(output.cpu().numpy()[0][0] * args.norm)
-                else:
-                    depth = 0
-                print(video, predicted, depth)
                 
-            
-            f_res.write("{} {} {}\n".format(i, predicted, depth))
+                output = eval_a_batch(imgs, model_depth, args.num_clips, args.num_crops, args.threed_data)
+                depth = int(output.cpu().numpy()[0][0] * args.norm)
+                
+
+                if model_stable is not None:
+                    output = eval_a_batch(imgs, model_stable, args.num_clips, args.num_crops, args.threed_data)
+                    stable = output.cpu().numpy()[0] * 100
+                    front_pred = int(stable[0])
+                    back_pred = int(stable[1])
+                print(video, predicted, depth, front_pred, back_pred)
+            f_res.write("{} {} {} {} {}\n".format(i, predicted, depth, front_pred, back_pred))
 
 
             # Convert PIL Image to OpenCV format
@@ -290,6 +359,9 @@ def test_both(videos, model_cls, model_depth, args):
             else:
                 depth_str = str(abs(depth))
             cv2.putText(img_cv, f'Predict Depth : {depth_str}', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255), 2, cv2.LINE_AA)
+            if model_stable is not None:
+                cv2.putText(img_cv, f'Front Stable : {front_pred}', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255), 2, cv2.LINE_AA)
+                cv2.putText(img_cv, f'Back Stable : {back_pred}', (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255), 2, cv2.LINE_AA)
             # cv2.imwrite('images/output.png', img_cv)          
             img_np = np.array(img_cv)
 
@@ -450,12 +522,18 @@ if __name__ == '__main__':
         args.pretrained = 'snapshots/laser_welding_depth-gray-TAM-b3-sum-resnet-50-f8-multisteps-bs16-e150_20240806_213424/checkpoint.pth.tar'
         args.depth = 50
         model_depth = create_model(args, 1)
-        test_both(videos, model_cls, model_depth, args)
+
+        #stable
+        args.pretrained = 'snapshots/laser_welding_stable-gray-resnet-18-f8-multisteps-bs16-e80_20240819_112343/checkpoint.pth.tar'
+        args.temporal_module_name = 'TSN'
+        args.depth = 18
+        model_stable = create_model(args, 2)
+        test_both(videos, model_cls, model_depth, args, model_stable)        
     elif args.type == 'mix':
         model = create_model(args, 8)
         test_mix(videos, model, args)        
 
     else:# for stable
         model = create_model(args, 2)
-        test_cls(videos, model, args)
+        test_stable(videos, model, args)
     

@@ -2,7 +2,7 @@ import os
 import shutil
 import time
 import sys
-import warnings
+
 
 import torch
 import torch.nn as nn
@@ -14,7 +14,6 @@ import torch.utils.data
 import torch.utils.data.distributed
 import torch.multiprocessing as mp
 from torch.optim import lr_scheduler
-# import tensorboard_logger
 
 from models import build_model
 from utils.utils import (build_dataflow, get_augmentor,save_checkpoint)

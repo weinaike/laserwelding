@@ -149,7 +149,7 @@ class S3D_ResNet(nn.Module):
         self.without_t_stride = without_t_stride
         self.inplanes = 64
         self.t_s = 1 if without_t_stride else 2
-        self.conv1 = BasicConv3d(3, 64, kernel_size=(3, 7, 7), stride=(1, 2, 2), padding=(1, 3, 3),
+        self.conv1 = BasicConv3d(1, 64, kernel_size=(3, 7, 7), stride=(1, 2, 2), padding=(1, 3, 3),
                                  bias=False)
         self.bn1 = nn.BatchNorm3d(64)
         self.relu = nn.ReLU(inplace=True)
@@ -250,6 +250,9 @@ def s3d_resnet(depth, num_classes, dropout, without_t_stride, dw_t_conv, **kwarg
     new_model_state_dict = model.state_dict()
     state_dict = model_zoo.load_url(model_urls['resnet{}'.format(depth)],
                                     map_location='cpu', progress=True)
+    state_dict.pop('fc.weight', None)
+    state_dict.pop('fc.bias', None)
+    state_dict['conv1.weight'] = torch.mean(state_dict['conv1.weight'], dim=1, keepdim=True)    
     state_d = inflate_from_2d_model(state_dict, new_model_state_dict,
                                     skipped_keys=['fc'])
     model.load_state_dict(state_d, strict=False)

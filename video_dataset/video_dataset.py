@@ -331,8 +331,9 @@ class VideoDataSet(data.Dataset):
         #     label = int(record.label)
         
         # re-order data to targeted format.
-        h, w = images.size()[-2:]
-        images = images.view(-1,h,w )
+        # print(images.size())
+        # h, w = images.size()[-2:]
+        # images = images.view(-1,h,w )
 
         if isinstance(record.label, list):  
             label = np.array(record.label)

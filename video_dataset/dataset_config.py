@@ -75,7 +75,7 @@ DATASET_CONFIG = {
         'num_classes': 2,
         'train_list_name': 'train_stable.txt',
         'val_list_name': 'val_stable.txt',
-        'test_list_name': 'stable_unknown.txt',
+        'test_list_name': 'val_stable.txt',
         'filename_seperator': " ",
         'image_tmpl': '{:05d}.png',
         'filter_video': 0

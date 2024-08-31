@@ -9,7 +9,7 @@ def moving_average(data, window_size):
 
 
 
-def plot_video_info():
+def plot_video_info(CLASS = True, DEPTH = True, STABLE = True):
     # 遍历‘data/test_2500’中的文件， 找到*.raw文件， 输出该文件所在完整路径
     # v_path = os.path.join('data', 'test_2500')
     v_path = os.path.join('data', 'test_20240722')
@@ -20,6 +20,19 @@ def plot_video_info():
         for file in files:
             if file.endswith('.raw'):
                 videos.append(os.path.join(root, file))
+
+    stable_dict = dict()
+    with open('data/stable/stable_label_all.txt', 'r') as f:
+        lines = f.readlines()
+        for line in lines[1:]:
+            line = line.strip()
+            items = line.split(',')
+            key = items[0]
+            surface = items[1]
+            if key not in stable_dict:
+                stable_dict[key] = dict()
+            stable_dict[key][surface] = items[2]
+
     for line in videos:
         dir = os.path.dirname(line)
         name = os.path.basename(line)
@@ -32,12 +45,21 @@ def plot_video_info():
                 id = int(item[0])
                 label = int(item[1])
                 depth = float(item[2])
+                front = 0
+                back = 0
+                if len(item) > 3:
+                    front = int(item[3])
+                    back = int(item[4])
+                if label != 0:
+                    depth = 0
+
                 if id < 100:
                     continue
                 elif id > 999:
                     continue
                 else:
-                    result.append([id, label, depth])      
+                    result.append([id, label, depth, front, back])
+  
         result = np.array(result)
         idx, thick, speed =  dir.split('/')[-1].split('_')
         idx = int(idx)
@@ -45,7 +67,7 @@ def plot_video_info():
         speed =  1000 / 60 * float(speed) 
 
         frames = result[:, 0] /200 * speed *1000
-        # result : 0: distance, 1: label, 2: depth, 3: KHD
+        # result : 0: distance, 1: label, 2: depth, 3:stable_front, 4:stable_back, 5: KHD
         # 获取该目录下 KHD.txt后缀文件
         for filename in os.listdir(dir):
             if filename.endswith('KHD.csv'):
@@ -69,110 +91,55 @@ def plot_video_info():
                 frames_res.append(x)
                 depth_res.append(y)    
         
-        ldd =  result[:, 3]
+        ldd =  result[:, 5]
 
-        fig, ax1 = plt.subplots(figsize=(10, 6))        
+        fig, ax1 = plt.subplots(figsize=(12, 6))        
         plt.title(name)
-        ax1.scatter(frames, ldd, label='LDD KHD Data', color='b', s=1)
-        ax1.scatter(frames_res, depth_res, label='Depth Predict', color='g', s=1)        
-        # Draw horizontal line at y=1000
-        ax1.axhline(y=thick, color='b', linestyle='--', label='Sample Thickness')
-        ax1.set_ylabel('Penetration Depth (um)', color='g')
-        ax1.set_xlabel('Distance (um)')
-        ax2 = ax1.twinx()
-        ax2.plot(frames, result[:, 1], label='Penetration_Status\n0: Incomplement Penetration\n1: Normal Penetration\n2: Over Penetration\n3: Unkown (No Info) Status', color='r')
-        ax2.set_ylim([0, 3])
-        plt.yticks(np.arange(-1, 5, 1))
-        ax2.set_ylabel('Penetration Status Predict', color='r')
-        fig.legend()
-        plt.savefig(os.path.join('result', name.replace('.raw', '.png')))
+        if DEPTH == True:
+            ax1.scatter(frames, ldd, label='LDD KHD Data', color='b', s=1)
+            ax1.scatter(frames_res, depth_res, label='Depth Predict', color='g', s=1)        
+            # Draw horizontal line at y=1000
+            ax1.axhline(y=thick, color='b', linestyle='--', label='Sample Thickness')
+            ax1.set_ylabel('Penetration Depth (um)', color='g')
+            ax1.set_xlabel('Distance (um)')
+            fig.legend(loc='center right')
+            plt.tight_layout(rect=[0, 0, 0.8, 1])
+            plt.savefig(os.path.join('result', name.replace('.raw', '_depth.png')))
+        if CLASS == True:
+            ax2 = ax1.twinx()
+            ax2.plot(frames, result[:, 1], label='Penetration_Status\n0: Incomplement Penetration\n1: Normal Penetration\n2: Over Penetration\n3: Unkown (No Info) Status', color='r')
+            ax2.set_ylim([0, 3])
+            plt.yticks(np.arange(-1, 5, 1))
+            ax2.tick_params(axis='y', colors='r')
+            ax2.set_ylabel('Penetration Status Predict', color='r')
+            fig.legend(loc='center right')
+            plt.tight_layout(rect=[0, 0, 0.8, 1])
+            plt.savefig(os.path.join('result', name.replace('.raw', '.png')))
+        if STABLE == True:
+            key = name.replace('.raw', '')
+            front = int(stable_dict[key]['1'])
+            back = int(stable_dict[key]['2'])
+
+            ax2 = ax1.twinx()
+            ax2.plot(frames, result[:, 3], label='Front Stable Predict', color='y', linestyle='--')
+            ax2.plot(frames, result[:, 4], label='Back Stable Predict', color='y')      
+            ax2.set_ylabel('\nStable Predict', color='y')
+            ax2.axhline(y=front, color='y', linestyle='-.', label='Front Stbale Label')
+            ax2.axhline(y=back, color='y', linestyle=':', label='Back Stable Label')
+            # ax2.spines['right'].set_color('y')# 右侧轴
+            # 设置刻度线和刻度标签的颜色
+            ax2.tick_params(axis='y', colors='y')
+            
+            fig.legend(loc='center right')
+            plt.yticks(np.arange(0, 100, 20))
+            plt.tight_layout(rect=[0, 0, 0.8, 1])            
+            plt.savefig(os.path.join('result', name.replace('.raw', '_all.png')))    
+
         plt.close()
 
 
-
-
-def plot_video_info():
-    # 遍历‘data/test_2500’中的文件， 找到*.raw文件， 输出该文件所在完整路径
-    # v_path = os.path.join('data', 'test_2500')
-    v_path = os.path.join('data', 'test_20240722')
-    
-    videos = []
-    # 遍历images目录中的所有文件
-    for root, dirs, files in os.walk(v_path):
-        for file in files:
-            if file.endswith('.raw'):
-                videos.append(os.path.join(root, file))
-    for line in videos:
-        dir = os.path.dirname(line)
-        name = os.path.basename(line)
-
-        result = []
-        with open(os.path.join('result', name.replace('.raw', '_both.txt'))) as f:
-            predicts = f.readlines()
-            for pred in predicts:
-                item = pred.strip().split(' ')
-                id = int(item[0])
-                label = int(item[1])
-                depth = float(item[2])
-                if id < 100:
-                    continue
-                elif id > 999:
-                    continue
-                else:
-                    result.append([id, label, depth])      
-        result = np.array(result)
-        idx, thick, speed =  dir.split('/')[-1].split('_')
-        idx = int(idx)
-        thick = -1 * int(thick)
-        speed =  1000 / 60 * float(speed) 
-
-        frames = result[:, 0] /200 * speed *1000
-        # result : 0: distance, 1: label, 2: depth, 3: KHD
-        # 获取该目录下 KHD.txt后缀文件
-        for filename in os.listdir(dir):
-            if filename.endswith('KHD.csv'):
-                csv_file = os.path.join(dir, filename)
-                df = pd.read_csv(csv_file, usecols=[0, 1])
-                # print(df.head())
-                # 截取第一列数据，数值范围在1000-8300之间的数据
-                df = df[(df['Keyhole Depth X (um)'] >= 500) & (df['Keyhole Depth X (um)'] <= 990000)]
-                #读取该文件的所有行
-                x = df['Keyhole Depth X (um)']
-                y = df['Keyhole Depth Z (um)']
-
-                f = interp1d(x, y)
-                new_y = f(frames).reshape(-1, 1)
-                result = np.concatenate((result, new_y), axis=1)
-        
-        frames_res = list()
-        depth_res = list()
-        for x, y in zip(frames, result[:, 2]):
-            if y != 0:
-                frames_res.append(x)
-                depth_res.append(y)    
-        
-        ldd =  result[:, 3]
-
-        fig, ax1 = plt.subplots(figsize=(10, 6))        
-        plt.title(name)
-        ax1.scatter(frames, ldd, label='LDD KHD Data', color='b', s=1)
-        ax1.scatter(frames_res, depth_res, label='Depth Predict', color='g', s=1)        
-        # Draw horizontal line at y=1000
-        ax1.axhline(y=thick, color='b', linestyle='--', label='Sample Thickness')
-        ax1.set_ylabel('Penetration Depth (um)', color='g')
-        ax1.set_xlabel('Distance (um)')
-        # ax2 = ax1.twinx()
-        # ax2.plot(frames, result[:, 1], label='Penetration_Status\n0: Incomplement Penetration\n1: Normal Penetration\n2: Over Penetration\n3: Unkown (No Info) Status', color='r')
-        # ax2.set_ylim([0, 3])
-        # plt.yticks(np.arange(-1, 5, 1))
-        # ax2.set_ylabel('Penetration Status Predict', color='r')
-        fig.legend()
-        plt.savefig(os.path.join('result', name.replace('.raw', '_depth.png')))
-        plt.close()
-
-
-def plot_depth_info():
-    csv_file = os.path.join('snapshots', 'laser_welding_depth-gray-TAM-b3-sum-resnet-50-f8', 'test_1crops_1clips_224.csv')
+def plot_depth_info(model: str):
+    csv_file = os.path.join('snapshots', model, 'test_1crops_1clips_224.csv')
     result = []
     with open(csv_file) as f:
         predicts = f.readlines()
@@ -200,95 +167,54 @@ def plot_depth_info():
     plt.close()
 
 
-def plot_stable(x, fws, tre, tle, lx, predicts, name, status=-1):
-    
+
+def plot_stable_info(model:str):
+    csv_file = os.path.join('snapshots', model, 'test_1crops_1clips_224.csv')
+    result = []
+    with open(csv_file) as f:
+        predicts = f.readlines()
+                
+        for pred in predicts:
+
+            item = pred.strip().split(',')
+            label = float(item[0])
+            
+            depth = float(item[1])
+            result.append([label, depth])
+    front = np.array(result[0:-2:2])
+    back = np.array(result[1:-1:2])
+    # 第一列排序result
+    sorted_indices = np.argsort(front[:, 0])[::-1]
+    front = front[sorted_indices]
+    sorted_indices = np.argsort(back[:, 0])[::-1]
+    back = back[sorted_indices]
+
     fig, ax1 = plt.subplots(figsize=(10, 6))
-    plt.title(name.replace('.txt', ' Stable Status') )
-    ax1.plot(x, fws, label='LDD FWS', color='g')
-    ax1.plot(x, tre, label='LDD TRE', color='r')
-    ax1.plot(x, tle, label='LDD TLE', color='b')
-    ax1.set_xlabel('Distance')
-    ax1.set_ylabel('um')
-    ax2 = ax1.twinx()
-    ax2.plot(lx, predicts, label='Stable Status\n-1: unknown\n 0: stable\n 1: unstable', color='y')
-    ax2.set_ylabel('Stable Status', color='y')
-    ax2.set_ylim([-1, 2])
-    plt.yticks(np.arange(-1, 2, 1))
+    plt.title('Front Stable Predict')
 
+    ax1.plot(front[:, 0], label='Front Stable Label', color='b')
+    ax1.plot(front[:, 1], label='Front Stable Predict', color='g')
+    ax1.set_xlabel('Sample Number')
+    ax1.set_ylabel('score')
+    ax1.legend()
+    plt.savefig(os.path.join('result', 'stable_front.png'))
+    plt.close()
 
-    fig.legend()
-    plt.savefig(os.path.join('result', name.replace('.txt', f'_stable_{status}.png')))
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+    plt.title('back Stable Predict')
+
+    ax1.plot(back[:, 0], label='Back Stable Label', color='b')
+    ax1.plot(back[:, 1], label='Back Stable Predict', color='g')
+    ax1.set_xlabel('Sample Number')
+    ax1.set_ylabel('score')
+    ax1.legend()
+    plt.savefig(os.path.join('result', 'stable_back.png'))
     plt.close()
 
 
-                          
-def plot_stable_info():
-    v_path = os.path.join('data', 'stable_20240621.txt')
-
-    videos = dict()
-    knows = dict()
-    with open(v_path, 'r') as f:
-        lines = f.readlines()
-    for line in lines:
-        line = line.strip()
-        items = line.split(' ')
-        if items[1] != 'unknown':
-            dir = items[0].split('/')[-2]
-            if items[1] == 'stable':
-                knows[dir] = 0
-            else:
-                knows[dir] = 1            
-        else:
-            name = os.path.basename(items[0].replace('.raw', '.txt'))
-            dir = items[0].split('/')[-2]
-            videos[name] = dir
-
-    for name, dir in videos.items():
-        result = os.path.join('result', name)
-        ldd = os.path.join('data', 'stable',  f'{dir}_all.csv')
-        if not os.path.exists(ldd):
-            continue
-
-        df = pd.read_csv(ldd)
-        x = df['x']
-        fws = df['FWS']
-        tre = df['TRE']
-        tle = df['TLE']
-
-        id = []
-        predicts = []
-        with open(result) as f:
-            ress = f.readlines()
-            for res in ress:
-                item = res.strip().split(' ')
-                id.append(int(item[0]))
-                predicts.append(int(item[1]))
-                
-        id = np.array(id)
-        predicts = np.array(predicts)
-
-        lx = id /200 *16.6667 *1000
-        plot_stable(x, fws, tre, tle, lx, predicts, name)
-
-
-    for dir , status in knows.items():
-        ldd = os.path.join('data', 'stable',  f'{dir}_all.csv')
-        if not os.path.exists(ldd):
-            continue
-        df = pd.read_csv(ldd)
-        x = df['x']
-        fws = df['FWS']
-        tre = df['TRE']
-        tle = df['TLE']
-
-        lx = np.array([0,90000]) 
-        predicts = np.array([int(status), int(status)])
-
-        plot_stable(x, fws, tre, tle, lx, predicts, f'{dir}.txt', status=status)
-
 if __name__ == '__main__':
     plot_video_info()
-    plot_depth_info()
-    # plot_stable_info()
+    plot_depth_info(model='laser_welding_depth-gray-TAM-b3-sum-resnet-50-f8')
+    plot_stable_info(model='laser_welding_stable-gray-resnet-18-f8')
 
 

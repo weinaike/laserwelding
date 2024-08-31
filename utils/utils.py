@@ -289,20 +289,30 @@ def train_regression(data_loader, model, criterion, optimizer, epoch, display=10
                 images = images.cuda(gpu_id, non_blocking=True)
 
             output = model(images)
-            
 
-            output = output.view(-1)
-            # output = torch.sigmoid(output).view(-1)
-            target = target.cuda(gpu_id, non_blocking=True)
-            target = target / norm
+            b,c = output.size()
+            if c == 1:
+                output = output.view(-1)
+                # output = torch.sigmoid(output).view(-1)
+                target = target.cuda(gpu_id, non_blocking=True)
+                target = target / norm
 
-            loss = criterion(output, target)
-            # loss = criterion(output/target, target/target) 
-            # print('loss:', loss.item(), 'output:', output/target, 'target:', target/target)
+                loss = criterion(output, target)
+                # loss = criterion(output/target, target/target) 
+                # print('loss:', loss.item(), 'output:', output/target, 'target:', target/target)
 
-            # measure accuracy and record loss
-            prec1 = distance(output, target, norm)
-            prec5 = prec1 # 无效
+                # measure accuracy and record loss
+                prec1 = distance(output, target, norm)
+                prec5 = prec1 # 无效
+            else:
+                target = target.to(torch.float32) 
+                target = target / norm
+                target = target.cuda(gpu_id, non_blocking=True)           
+
+                loss = criterion(output, target)
+                # measure accuracy and record loss
+                prec1 = distance(output[:,0], target[:,0], norm)
+                prec5 = distance(output[0,1], target[:,1], norm)
 
             if dist.is_initialized():
                 world_size = dist.get_world_size()
@@ -355,7 +365,7 @@ def validate_regression(data_loader, model, criterion, gpu_id=None, norm = -1000
 
     all_preds = []
     all_labels = []    
-
+    c = 0
     with torch.no_grad(), tqdm(total=len(data_loader)) as t_bar:
         end = time.time()
         for i, (images, target) in enumerate(data_loader):
@@ -373,20 +383,29 @@ def validate_regression(data_loader, model, criterion, gpu_id=None, norm = -1000
             # compute output
             output = model(images)
             
-            output = output.view(-1)
-            # output = torch.sigmoid(output).view(-1)
-            target = target.cuda(gpu_id, non_blocking=True)
+            b,c = output.size()
+            if c == 1:
+                output = output.view(-1)
+                # output = torch.sigmoid(output).view(-1)
+                target = target.cuda(gpu_id, non_blocking=True)
+                target = target / norm
 
-            target = target / norm
+                loss = criterion(output, target)
+                # loss = criterion(output/target, target/target) 
+                # print('loss:', loss.item(), 'output:', output/target, 'target:', target/target)
 
-            loss = criterion(output, target) 
-            # print(output, target, loss.item())
-            # loss = criterion(output/target, target/target) 
+                # measure accuracy and record loss
+                prec1 = distance(output, target, norm)
+                prec5 = prec1 # 无效
+            else:
+                target = target.to(torch.float32) 
+                target = target / norm
+                target = target.cuda(gpu_id, non_blocking=True)           
 
-            # measure accuracy and record loss
-            prec1 = distance(output, target, norm)
-            # print('prec1:', prec1)
-            prec5 = prec1 # 无效
+                loss = criterion(output, target)
+                # measure accuracy and record loss
+                prec1 = distance(output[:,0], target[:,0], norm)
+                prec5 = distance(output[0,1], target[:,1], norm)
 
             if dist.is_initialized():
                 # print("dist.is_initialized()")
@@ -409,13 +428,24 @@ def validate_regression(data_loader, model, criterion, gpu_id=None, norm = -1000
             all_labels.extend(target.cpu().numpy())
             # print('avg:', losses.avg, 'count:', losses.count)
     
-    
-    diff = np.abs((np.array(all_labels) - np.array(all_preds)) * norm)
-    cm = [np.max(diff) , np.min(diff), np.sum(diff < 1000), len(all_labels)] 
-    # 距离统计
-    print('max , min,  right, total:')
-    print(cm)
+    if c == 1:
+        diff = np.abs((np.array(all_labels) - np.array(all_preds)) * norm)
+        cm = [np.max(diff) , np.min(diff), np.sum(diff < 1000), len(all_labels)] 
+        # 距离统计
+        print('max , min,  right, total:')
+        print(cm)
+    else:
+        for i in range(c):
+            diff = np.abs((np.array(all_labels) - np.array(all_preds)) * norm)
+            cm = [np.max(diff[:,i]) , np.min(diff[:,i]), np.mean(diff[:,i]), len(all_labels)] 
+            # 输出三分类测试混淆矩阵
+            print('max , min,  mean, total:')
+            print(cm)
+        
     return top1.avg, top5.avg, losses.avg, batch_time.avg, cm
+
+
+
 
 
 
@@ -656,3 +686,6 @@ def validate_mix(data_loader, model, criterion, gpu_id=None, norm = -10000.0):
     # print('Confusion Matrix:')
     # print(cm3)   
     return top1.avg, top2.avg, losses.avg, batch_time.avg, cms
+
+
+

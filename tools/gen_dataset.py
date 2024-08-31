@@ -102,33 +102,6 @@ def filter_khd_info(lines):
     return result
 
 
-def filter_stable_info(lines):
-
-    with open(f"images/stable_all.txt", 'w') as f:
-        for item in lines:
-            f.write("%s\n" % item.strip()) 
-
-    result = []
-    unknown = []
-    for line in lines:
-        line = line[7:] 
-        line = line.strip()
-        items = line.split(' ')
-        if len(items) < 2:
-            continue
-        if int(items[-1]) < 0:
-            unknown.append(line)
-        else:
-            result.append(line)                
-    with open(f"images/stable_filter.txt", 'w') as f:
-        for item in result:
-            f.write("%s\n" % item)
-    with open(f"images/stable_unknown.txt", 'w') as f:
-        for item in unknown:
-            f.write("%s\n" % item)
-    
-    return result
-
 def split_trainval_ratio(lines, ext, val_ratio = 0.1):
     random.seed(42)
     # 遍历 lines 中所有的行， 判断图片文件是否存在， 如果不存在， 则删除这一行
@@ -204,9 +177,8 @@ if __name__ == "__main__":
 
     # split_trainval_count(all_pene + black_list, 'penetration', val_num = 50)
 
-    all_khd_filter = filter_khd_info(all_khd)
-    split_trainval_ratio(all_khd_filter, 'depth', val_ratio = 0.1)
+    # all_khd_filter = filter_khd_info(all_khd)
+    # split_trainval_ratio(all_khd_filter, 'depth', val_ratio = 0.1)
 
 
-    # all_stable_filter = filter_stable_info(all_stable)
-    # split_trainval_ratio(all_stable_filter, 'stable', val_ratio = 0.1)
+    split_trainval_ratio(all_stable, 'stable', val_ratio = 0.1)

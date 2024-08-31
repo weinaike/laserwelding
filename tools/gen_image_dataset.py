@@ -190,11 +190,15 @@ def gen_stable_labels(v_lists, image_paths, output, param:dict,label_file:str):
     stable_dict = dict()
     with open(label_file, 'r') as f:
         lines = f.readlines()
-        for line in lines:
+        for line in lines[1:]:
             line = line.strip()
-            items = line.split(' ')
-            key = os.path.join('data', os.path.dirname(os.path.normpath(items[0])))
-            stable_dict[key] = items[1]
+            items = line.split(',')
+            key = items[0]
+            surface = items[1]
+            if key not in stable_dict:
+                stable_dict[key] = dict()
+            stable_dict[key][surface] = items[2]
+    # print(stable_dict)
 
     frames = param['frames'] 
     fps = param['fps']
@@ -202,30 +206,29 @@ def gen_stable_labels(v_lists, image_paths, output, param:dict,label_file:str):
     stable_name = output + "/stable.txt"
     f_stable = open(stable_name, 'w')
     
+    
     for i in range(len(v_lists)):
         # 提取v文件所在的目录
         path = os.path.dirname(v_lists[i])
-        if path not in stable_dict:
-            print(f'{path} not in stable_dict')
+        path = os.path.basename(path)
+        if '_' in path:
+            path = str(int(path.split('_')[1]))
+        key = path + '#'
+        
+        if key not in stable_dict:
+            print(f'{key} not in stable_dict')
             continue
-        label_name = stable_dict[path]
+        face = stable_dict[key]
+
+        top = face['1']
+        bottom = face['2']
 
         start = int(fps * 0.5) # 0.5s * 200fps
         step = 32
         end = frames # 999
-
-        label_id = -1
-        if label_name == 'stable':
-            label_id = 0
-        elif label_name == 'unstable':
-            label_id = 1
-        elif label_name == 'unknown':
-            label_id = -1
         
-        for j in range(start, end - step, step):
-            
-            
-            line = f'{image_paths[i]} {j} {j + step} {label_id}\n'
+        for j in range(start, end - step, step):           
+            line = f'{image_paths[i]} {j} {j + step} {top} {bottom}\n'
             f_stable.write(line)
 
     f_stable.close()
@@ -237,10 +240,12 @@ if __name__ == "__main__":
     argparse.add_argument('--image', action='store_true', default=False, help='extract images from video files')
     args = argparse.parse_args()
     
-    #              ['20240603_2500', 16.667 , 1000], 
-    #              ['20240605_1900', 16.667 , 1000], 
-    #              ['20240605_2500', 16.667 , 1200], 
-    data_list = [['20240722_2500', 16.667 , 1200], 
+
+    data_list = [
+                 ['20240603_2500', 16.667 , 1000], 
+                 ['20240605_1900', 16.667 , 1000], 
+                 ['20240605_2500', 16.667 , 1200], 
+                 ['20240722_2500', 16.667 , 1200], 
                  ['20240722_3500_MAG', 25.0 , 1200], 
                  ['20240722_4500_MAG', 25.0 , 1200], 
                  ['20240722_5500', 8.333 , 1200], 
@@ -293,7 +298,7 @@ if __name__ == "__main__":
         
         gen_depth_labels(v_lists, image_paths, output, param)
         gen_mix_labels(v_lists, image_paths, output, param)
-        # gen_stable_labels(v_lists, image_paths, output, param, 'data/stable_20240621.txt')
+        gen_stable_labels(v_lists, image_paths, output, param, 'data/stable/stable_label_all.txt')
 
 
 

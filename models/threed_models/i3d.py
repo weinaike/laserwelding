@@ -23,7 +23,7 @@ class I3D(nn.Module):
             self.pooling_functor = F.max_pool3d
         self.without_t_stride = without_t_stride
         self.t_s = 1 if without_t_stride else 2
-        self.conv1 = BasicConv3d(3, 64, kernel_size=(7, 7, 7), stride=(1, 2, 2), padding=(3, 3, 3))
+        self.conv1 = BasicConv3d(1, 64, kernel_size=(7, 7, 7), stride=(1, 2, 2), padding=(3, 3, 3))
         self.conv2 = BasicConv3d(64, 64, kernel_size=1)
         self.conv3 = BasicConv3d(64, 192, kernel_size=3, stride=1, padding=1)
 

@@ -1,13 +1,11 @@
 import os
 import time
 
-import torch.nn as nn
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
-import torchvision.transforms as transforms
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix
 from models import build_model
@@ -123,7 +121,7 @@ def main():
     print("Image is scaled to {} and crop {}".format(scale_size, args.input_size))
     print("Number of crops: {}".format(args.num_crops))
     print("Number of clips: {}".format(args.num_clips))
-
+    print(data_list)
     val_dataset = VideoDataSet(args.datadir, data_list, args.groups, args.frames_per_group,
                                  num_clips=args.num_clips, modality=args.modality,
                                  image_tmpl=image_tmpl, dense_sampling=args.dense_sampling,
@@ -198,7 +196,7 @@ def main():
             else:
                 # testing, store output to prepare csv file
                 output = output.data.cpu().numpy().copy()
-                batch_size = output.shape[0]
+                batch_size, col = output.shape
                 outputs[total_outputs:total_outputs + batch_size, :] = output
                 
                 predictions = np.argsort(output, axis=1)
@@ -206,7 +204,12 @@ def main():
                     # print("{},{},{}".format(str(label.numpy()), str(output),  str(output * -3000.0), file=logfile))
                     all_preds.extend(output[0] * args.norm)
                     all_labels.append(label.numpy())
-                    print("{},{}".format(str(label.numpy()[0]), output[0][0] * args.norm), file=logfile)
+                    if col == 1:
+                        print("{},{}".format(str(label.numpy()[0]), output[0][0] * args.norm), file=logfile)
+                    elif col:
+                        for i in range(col):
+                            print("{},{}".format(str(label.numpy()[0][i]), output[0][i] * args.norm), file=logfile)
+
                 else:
                     for ii in range(len(predictions)):
                         # preds = [id_to_label[str(pred)] for pred in predictions[ii][::-1][:5]]
@@ -237,6 +240,32 @@ def main():
         print('Confusion Matrix:')
         print(cm)
         print(cm, file=logfile)
+
+        val_file = os.path.join(data_list)
+        with open(val_file, 'r') as f:
+            lines = f.readlines()
+        if not os.path.exists('result/error_samples'):
+            os.mkdir('result/error_samples')
+        for i, (label, pred) in enumerate(zip(all_labels, all_preds)):
+            if label != pred:
+                items = lines[i].split(' ')
+                img_dir = os.path.join(args.datadir, items[0])
+                start = int(items[1])
+                end = int(items[2])
+                sampled_id = items[0].split('/')[-1]
+                labels_map ={ 0: 'Incompelement_Penetration', 1: 'Normal_Penetration', 2: 'Over_Penetration', 3: 'black', -1 : 'unkown'}
+                # 保存错误样本
+                sample_dir = f'result/error_samples/{sampled_id}#_start[{start}]_end[{end}]_lablel[{labels_map[label]}]_predict[{labels_map[pred]}]'
+                if os.path.exists(sample_dir):
+                    os.rmdir(sample_dir)
+                os.mkdir(sample_dir)   
+                print(f"Sample {lines[i]}: True Label = {label}, Predicted Label = {pred}")             
+                for j in range(start, end):
+                    img_path = os.path.join(img_dir, f'{j:05d}.png')
+                    os.system(f'cp {img_path} {sample_dir}')                
+
+                
+
     # print(all_labels, all_preds)
     if args.type == 'regression':
         print("avg depth:", np.mean(np.abs(np.array(all_labels).reshape(-1) - np.array(all_preds).reshape(-1))))
