@@ -1,6 +1,7 @@
 # 一、安装
 
 1. 安装依赖库
+   建议 python 版本3.10
 
    ```
    pip install -r requirements.txt
@@ -12,16 +13,16 @@
    ```
 3. 项目目录结构
 
->   .
->    ├── data				# 存放原始数据
->    ├── images				# 存放
->    ├── models				# 网络模型
->    ├── README.md			# 说明文档
->    ├── result				# 测试运行结果
->    ├── script				# 训练与测试脚本
->    ├── snapshots			# 训练运行结果
->    ├── tools				# 分析工具
->    ├── video_dataset		# 数据集
+> .
+> ├── data				# 存放原始数据
+> ├── images				# 存放
+> ├── models				# 网络模型
+> ├── README.md			# 说明文档
+> ├── result				# 测试运行结果
+> ├── script				# 训练与测试脚本
+> ├── snapshots			# 训练运行结果
+> ├── tools				# 分析工具
+> ├── video_dataset		# 数据集
 
 # 二、准备数据集
 
