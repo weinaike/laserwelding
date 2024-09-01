@@ -516,10 +516,10 @@ if __name__ == '__main__':
         model = create_model(args, 1)
         test_depth(videos, model, args)
     elif args.type == 'both':
-        args.pretrained = 'snapshots/laser_welding-gray-TAM-b3-sum-resnet-18-f8-multisteps-bs16-e120_20240805_163936/checkpoint.pth.tar'
+        args.pretrained = 'snapshots/laser_welding-gray-TSN-b3-sum-resnet-18-f8-multisteps-bs16-e120_20240808_114843/checkpoint.pth.tar'
         args.depth = 18
         model_cls = create_model(args, 4)
-        args.pretrained = 'snapshots/laser_welding_depth-gray-TAM-b3-sum-resnet-50-f8-multisteps-bs16-e150_20240806_213424/checkpoint.pth.tar'
+        args.pretrained = 'snapshots/laser_welding_depth-gray-TSN-b3-sum-resnet-50-f8-multisteps-bs16-e150_20240808_114820/checkpoint.pth.tar'
         args.depth = 50
         model_depth = create_model(args, 1)
 

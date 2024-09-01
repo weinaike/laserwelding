@@ -14,7 +14,7 @@ from utils.video_transforms import *
 from video_dataset.video_dataset import VideoDataSet
 from video_dataset.dataset_config import get_dataset_config
 from opts import arg_parser
-
+import shutil
 import matplotlib.pyplot as plt
 import torchvision
 
@@ -257,7 +257,7 @@ def main():
                 # 保存错误样本
                 sample_dir = f'result/error_samples/{sampled_id}#_start[{start}]_end[{end}]_lablel[{labels_map[label]}]_predict[{labels_map[pred]}]'
                 if os.path.exists(sample_dir):
-                    os.rmdir(sample_dir)
+                    shutil.rmtree(sample_dir)
                 os.mkdir(sample_dir)   
                 print(f"Sample {lines[i]}: True Label = {label}, Predicted Label = {pred}")             
                 for j in range(start, end):
