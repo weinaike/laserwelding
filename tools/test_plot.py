@@ -213,8 +213,8 @@ def plot_stable_info(model:str):
 
 
 if __name__ == '__main__':
-    plot_video_info()
-    plot_depth_info(model='laser_welding_depth-gray-TAM-b3-sum-resnet-50-f8')
+    plot_video_info(CLASS = False, DEPTH = False, STABLE = True)
+    plot_depth_info(model='laser_welding_depth-gray-TSN-b3-sum-resnet-50-f8')
     plot_stable_info(model='laser_welding_stable-gray-resnet-18-f8')
 
 

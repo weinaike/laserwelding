@@ -1,7 +1,11 @@
 # 一、安装
 
+运行环境：
+
+* Ubuntu 22.04
+* python 3.10
+
 1. 安装依赖库
-   建议 python 版本3.10
 
    ```
    pip install -r requirements.txt
@@ -106,22 +110,7 @@
 * video_demo_both.sh
   注意，该脚本涉及多个模型，因而pretrained设置是无效的，需要video_demo.py内部修改模型地址
 
-```
   elif args.type == 'both':
-          args.pretrained = 'snapshots/laser_welding-gray-TAM-b3-sum-resnet-18-f8-multisteps-bs16-e120_20240805_163936/checkpoint.pth.tar'
-          args.depth = 18
-          model_cls = create_model(args, 4)
-          args.pretrained = 'snapshots/laser_welding_depth-gray-TAM-b3-sum-resnet-50-f8-multisteps-bs16-e150_20240806_213424/checkpoint.pth.tar'
-          args.depth = 50
-          model_depth = create_model(args, 1)
-
-          #stable
-          args.pretrained = 'snapshots/laser_welding_stable-gray-resnet-18-f8-multisteps-bs16-e80_20240819_112343/checkpoint.pth.tar'
-          args.temporal_module_name = 'TSN'
-          args.depth = 18
-          model_stable = create_model(args, 2)
-          test_both(videos, model_cls, model_depth, args, model_stable)  
-```
 
 # 四、数据分析
 
@@ -132,3 +121,20 @@ sh script/runtest.sh
 ```
 
 具体的分析内容，请查看研究报告
+
+
+# 五、模型导出
+
+导出工具见：tools/export.py
+
+项目中使用到的模型：
+
+* snapshots/laser_welding-gray-TAM-b3-sum-resnet-18-f8-multisteps-bs16-e120_20240805_163936/checkpoint.pth.tar
+* snapshots/laser_welding_depth-gray-TAM-b3-sum-resnet-50-f8-multisteps-bs16-e150_20240806_213424/checkpoint.pth.tar
+* snapshots/laser_welding_stable-gray-resnet-18-f8-multisteps-bs16-e80_20240819_112343/checkpoint.pth.tar
+
+他们转为ONNX格式，可以在在线软件中使用，导出目录zoo
+
+* 熔深模型：laser_welding_depth.onnx
+* 成形质量模型：laser_welding_stable.onnx
+* 熔透状态模型：laser_welding.onnx

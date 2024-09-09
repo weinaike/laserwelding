@@ -4,7 +4,7 @@ DATASET_CONFIG = {
     'laser_welding': {
         'num_classes': 4,
         'train_list_name': 'train_penetration.txt',
-        'val_list_name': 'val_penetration.txt',
+        'val_list_name': 'val_penetration_check.txt',
         'test_list_name': 'unknown.txt',
         'filename_seperator': " ",
         'image_tmpl': '{:05d}.png',
